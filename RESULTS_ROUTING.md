@@ -110,6 +110,24 @@ no KV-cache, router ~0 cost. Heads are portable artifacts scoped to
 — a new task means training its answer head and caching a few hundred
 residuals for the routing distribution.
 
+**Training independence.** The router and the answer heads are trained
+fully independently — no joint training anywhere:
+
+- The task-ID probe is a single closed-set classifier
+  `(L1 residual → task label)`; it never sees the answer heads.
+- Each answer head is trained per-task, per-layer on its own residuals
+  and answer labels, orthogonal to every other head and to the probe.
+
+The only coupling is at serving time, where the probe's output selects
+the head. This is what makes heads portable: a new task's head is trained
+standalone and dropped in. The one asymmetry between routers is the cost
+of extending the closed set with task N+1 — the supervised probe must be
+retrained on N+1 classes, while Mahalanobis needs nothing beyond the new
+task's L1 residual bank. Mahalanobis pays for that convenience with the
+order-fragility shown in section 7: at L1 it misroutes order-scrambled or
+off-manifold inputs, so the supervised probe is the practical L1 router
+despite the retrain-on-extension cost.
+
 ### 7. Cross-scale replication: Qwen3-8B (Modal A100-80GB)
 
 Pilot at L35, t1000/v400 (`modal_multihead.py`, uniform refit heads):
