@@ -3,7 +3,7 @@
 Attaches all saved closed-set answer heads to the same final residual and
 compares routers:
 
-  oracle            gold task head (upper bound on answer acc)
+  gold_task_ceiling  gold task head (reference: upper bound on answer acc)
   naive_max_conf    pick head with highest *answer* confidence
   mahalanobis       pick task whose train residual Gaussian fits best
   task_id_linear    logistic task-ID probe on residual
@@ -542,8 +542,8 @@ def main():
     net = fit_task_id_mlp(Xtr, ytr_task, probe_dev)
     tid_mlp, tid_mlp_conf = predict_task_mlp(net, Xva)
 
-    # Oracle / naive / maha routes
-    oracle = y_task.copy()
+    # Gold-task reference / naive / maha routes
+    gold_ceiling = y_task.copy()
     naive = route_naive_max_conf(confs)
     maha_route = route_mahalanobis(maha_scores)
 
@@ -551,7 +551,7 @@ def main():
 
     results = []
     for name, route, rconf in [
-        ("oracle", oracle, np.ones(n)),
+        ("gold_task_ceiling", gold_ceiling, np.ones(n)),
         ("naive_max_conf", naive, np.stack([confs[t] for t in TASKS], 1).max(1)),
         ("mahalanobis", maha_route,
          # softmax over maha scores as pseudo-conf
@@ -565,7 +565,7 @@ def main():
         # evaluate_router uses preds[task][i] when route picks that task
         ev = evaluate_router(
             name, route.astype(np.int64), y_task, preds, y_ans, n_classes_of,
-            router_conf=rconf, abstain_thresh=0.7 if name != "oracle" else None,
+            router_conf=rconf, abstain_thresh=0.7 if name != "gold_task_ceiling" else None,
         )
         results.append(ev)
         print(f"\n=== router: {name} ===")
@@ -614,7 +614,7 @@ def main():
 
     # Chance baselines
     chance_task = 1.0 / len(TASKS)
-    oracle_ans = next(r for r in results if r["router"] == "oracle")["answer_acc_strict"]
+    ceiling_ans = next(r for r in results if r["router"] == "gold_task_ceiling")["answer_acc_strict"]
 
     summary = {
         "meta": {
@@ -634,7 +634,7 @@ def main():
         "confidence_matrix": conf_mat,
         "routers": results,
         "per_task_breakdown": breakdown,
-        "oracle_answer_acc": oracle_ans,
+        "gold_task_ceiling_answer": ceiling_ans,
     }
 
     out_path = args.out or os.path.join(
@@ -649,7 +649,7 @@ def main():
     for r in results:
         print(f"  {r['router']:18s}  task={r['task_acc']:.3f}  "
               f"ans_strict={r['answer_acc_strict']:.3f}")
-    print(f"oracle answer (correct head always): {oracle_ans:.3f}")
+    print(f"gold-task ceiling answer (correct head always): {ceiling_ans:.3f}")
     print("==============================")
     return summary
 
