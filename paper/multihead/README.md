@@ -13,6 +13,9 @@ single-head paper figures under `paper/figures/`.
 - `figures/multihead_shuffle_layers.png` — shuffle robustness for the
   supervised task-ID probe and Mahalanobis router.
 - `plot_multihead.py` — deterministic figure generator.
+- `literature.md` — related-work scan and positioning note.
+- `deployment-analysis.md` — systems/commercial analysis of direct
+  readouts, adaptive depth, batching, and the required production benchmark.
 
 Regenerate all three figures from the repository root with:
 
