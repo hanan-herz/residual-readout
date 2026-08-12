@@ -1,0 +1,329 @@
+{
+  "meta": {
+    "model": "0.6B",
+    "model_id": "Qwen/Qwen3-0.6B",
+    "layer": 1,
+    "max_train": 400,
+    "max_val": 200,
+    "n_mixed_val": 600,
+    "tasks": [
+      "boolq",
+      "ruletaker",
+      "arc"
+    ],
+    "heads": {
+      "boolq": "/Users/hanan/projects/ai/vector-is-the-answer/cloud_bench_cache/Qwen__Qwen3-0.6B/boolq/heads/head_l1.npz",
+      "ruletaker": "/Users/hanan/projects/ai/vector-is-the-answer/cloud_bench_cache/Qwen__Qwen3-0.6B/ruletaker/heads/head_l1.npz",
+      "arc": "/Users/hanan/projects/ai/vector-is-the-answer/cloud_bench_cache/Qwen__Qwen3-0.6B/arc/heads/head_l1.npz"
+    },
+    "chance_task_acc": 0.3333333333333333
+  },
+  "cross_task_answer": {
+    "boolq": {
+      "boolq": {
+        "acc": 0.67,
+        "mean_conf": 0.809694230556488,
+        "n": 200
+      },
+      "ruletaker": {
+        "acc": 0.5,
+        "mean_conf": 0.9234529733657837,
+        "n": 200
+      },
+      "arc": null
+    },
+    "ruletaker": {
+      "boolq": {
+        "acc": 0.54,
+        "mean_conf": 0.9049668908119202,
+        "n": 200
+      },
+      "ruletaker": {
+        "acc": 0.525,
+        "mean_conf": 0.8071451783180237,
+        "n": 200
+      },
+      "arc": null
+    },
+    "arc": {
+      "boolq": null,
+      "ruletaker": null,
+      "arc": {
+        "acc": 0.305,
+        "mean_conf": 0.8024967908859253,
+        "n": 200
+      }
+    }
+  },
+  "confidence_matrix": {
+    "boolq": {
+      "boolq": 0.809694230556488,
+      "ruletaker": 0.9234529733657837,
+      "arc": 0.9999897480010986
+    },
+    "ruletaker": {
+      "boolq": 0.9049668908119202,
+      "ruletaker": 0.8071451783180237,
+      "arc": 0.9999998211860657
+    },
+    "arc": {
+      "boolq": 0.9803227186203003,
+      "ruletaker": 0.9038903713226318,
+      "arc": 0.8024967908859253
+    }
+  },
+  "routers": [
+    {
+      "router": "oracle",
+      "n": 600,
+      "task_acc": 1.0,
+      "answer_acc_strict": 0.5,
+      "answer_acc_given_correct_route": 0.5,
+      "confusion": [
+        [
+          200,
+          0,
+          0
+        ],
+        [
+          0,
+          200,
+          0
+        ],
+        [
+          0,
+          0,
+          200
+        ]
+      ],
+      "confusion_labels": [
+        "boolq",
+        "ruletaker",
+        "arc"
+      ]
+    },
+    {
+      "router": "naive_max_conf",
+      "n": 600,
+      "task_acc": 0.051666666666666666,
+      "answer_acc_strict": 0.035,
+      "answer_acc_given_correct_route": 0.6774193548387096,
+      "confusion": [
+        [
+          7,
+          38,
+          155
+        ],
+        [
+          82,
+          24,
+          94
+        ],
+        [
+          101,
+          99,
+          0
+        ]
+      ],
+      "confusion_labels": [
+        "boolq",
+        "ruletaker",
+        "arc"
+      ],
+      "abstain_thresh": 0.7,
+      "keep_rate": 1.0,
+      "task_acc_kept": 0.051666666666666666,
+      "answer_acc_strict_kept": 0.035
+    },
+    {
+      "router": "mahalanobis",
+      "n": 600,
+      "task_acc": 1.0,
+      "answer_acc_strict": 0.5,
+      "answer_acc_given_correct_route": 0.5,
+      "confusion": [
+        [
+          200,
+          0,
+          0
+        ],
+        [
+          0,
+          200,
+          0
+        ],
+        [
+          0,
+          0,
+          200
+        ]
+      ],
+      "confusion_labels": [
+        "boolq",
+        "ruletaker",
+        "arc"
+      ],
+      "abstain_thresh": 0.7,
+      "keep_rate": 1.0,
+      "task_acc_kept": 1.0,
+      "answer_acc_strict_kept": 0.5
+    },
+    {
+      "router": "task_id_linear",
+      "n": 600,
+      "task_acc": 1.0,
+      "answer_acc_strict": 0.5,
+      "answer_acc_given_correct_route": 0.5,
+      "confusion": [
+        [
+          200,
+          0,
+          0
+        ],
+        [
+          0,
+          200,
+          0
+        ],
+        [
+          0,
+          0,
+          200
+        ]
+      ],
+      "confusion_labels": [
+        "boolq",
+        "ruletaker",
+        "arc"
+      ],
+      "abstain_thresh": 0.7,
+      "keep_rate": 1.0,
+      "task_acc_kept": 1.0,
+      "answer_acc_strict_kept": 0.5
+    },
+    {
+      "router": "task_id_mlp",
+      "n": 600,
+      "task_acc": 1.0,
+      "answer_acc_strict": 0.5,
+      "answer_acc_given_correct_route": 0.5,
+      "confusion": [
+        [
+          200,
+          0,
+          0
+        ],
+        [
+          0,
+          200,
+          0
+        ],
+        [
+          0,
+          0,
+          200
+        ]
+      ],
+      "confusion_labels": [
+        "boolq",
+        "ruletaker",
+        "arc"
+      ],
+      "abstain_thresh": 0.7,
+      "keep_rate": 1.0,
+      "task_acc_kept": 1.0,
+      "answer_acc_strict_kept": 0.5
+    }
+  ],
+  "per_task_breakdown": {
+    "naive_max_conf": {
+      "boolq": {
+        "task_acc": 0.035,
+        "answer_when_self": 0.8571428571428571,
+        "mean_conf_by_head": {
+          "boolq": 0.809694230556488,
+          "ruletaker": 0.9049668908119202,
+          "arc": 0.9803227186203003
+        },
+        "route_hist": {
+          "boolq": 7,
+          "ruletaker": 38,
+          "arc": 155
+        }
+      },
+      "ruletaker": {
+        "task_acc": 0.12,
+        "answer_when_self": 0.625,
+        "mean_conf_by_head": {
+          "boolq": 0.9234529733657837,
+          "ruletaker": 0.8071451783180237,
+          "arc": 0.9038903713226318
+        },
+        "route_hist": {
+          "boolq": 82,
+          "ruletaker": 24,
+          "arc": 94
+        }
+      },
+      "arc": {
+        "task_acc": 0.0,
+        "answer_when_self": NaN,
+        "mean_conf_by_head": {
+          "boolq": 0.9999897480010986,
+          "ruletaker": 0.9999998211860657,
+          "arc": 0.8024967908859253
+        },
+        "route_hist": {
+          "boolq": 101,
+          "ruletaker": 99,
+          "arc": 0
+        }
+      }
+    },
+    "task_id_linear": {
+      "boolq": {
+        "task_acc": 1.0,
+        "answer_when_self": 0.67,
+        "mean_conf_by_head": {
+          "boolq": 0.809694230556488,
+          "ruletaker": 0.9049668908119202,
+          "arc": 0.9803227186203003
+        },
+        "route_hist": {
+          "boolq": 200,
+          "ruletaker": 0,
+          "arc": 0
+        }
+      },
+      "ruletaker": {
+        "task_acc": 1.0,
+        "answer_when_self": 0.525,
+        "mean_conf_by_head": {
+          "boolq": 0.9234529733657837,
+          "ruletaker": 0.8071451783180237,
+          "arc": 0.9038903713226318
+        },
+        "route_hist": {
+          "boolq": 0,
+          "ruletaker": 200,
+          "arc": 0
+        }
+      },
+      "arc": {
+        "task_acc": 1.0,
+        "answer_when_self": 0.305,
+        "mean_conf_by_head": {
+          "boolq": 0.9999897480010986,
+          "ruletaker": 0.9999998211860657,
+          "arc": 0.8024967908859253
+        },
+        "route_hist": {
+          "boolq": 0,
+          "ruletaker": 0,
+          "arc": 200
+        }
+      }
+    }
+  },
+  "oracle_answer_acc": 0.5
+}

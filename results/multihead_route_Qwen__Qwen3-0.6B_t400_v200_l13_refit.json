@@ -1,0 +1,330 @@
+{
+  "meta": {
+    "model": "0.6B",
+    "model_id": "Qwen/Qwen3-0.6B",
+    "layer": 13,
+    "max_train": 400,
+    "max_val": 200,
+    "n_mixed_val": 600,
+    "tasks": [
+      "boolq",
+      "ruletaker",
+      "arc"
+    ],
+    "heads": {
+      "boolq": "(refit)",
+      "ruletaker": "(refit)",
+      "arc": "(refit)"
+    },
+    "head_protocol": "refit-on-pilot-train",
+    "chance_task_acc": 0.3333333333333333
+  },
+  "cross_task_answer": {
+    "boolq": {
+      "boolq": {
+        "acc": 0.685,
+        "mean_conf": 0.8992838859558105,
+        "n": 200
+      },
+      "ruletaker": {
+        "acc": 0.52,
+        "mean_conf": 0.8675220012664795,
+        "n": 200
+      },
+      "arc": null
+    },
+    "ruletaker": {
+      "boolq": {
+        "acc": 0.565,
+        "mean_conf": 0.9292370676994324,
+        "n": 200
+      },
+      "ruletaker": {
+        "acc": 0.595,
+        "mean_conf": 0.9053669571876526,
+        "n": 200
+      },
+      "arc": null
+    },
+    "arc": {
+      "boolq": null,
+      "ruletaker": null,
+      "arc": {
+        "acc": 0.255,
+        "mean_conf": 0.7956039309501648,
+        "n": 200
+      }
+    }
+  },
+  "confidence_matrix": {
+    "boolq": {
+      "boolq": 0.8992838859558105,
+      "ruletaker": 0.8675220012664795,
+      "arc": 0.9828187823295593
+    },
+    "ruletaker": {
+      "boolq": 0.9292370676994324,
+      "ruletaker": 0.9053669571876526,
+      "arc": 0.999991238117218
+    },
+    "arc": {
+      "boolq": 0.8773353099822998,
+      "ruletaker": 0.8606253266334534,
+      "arc": 0.7956039309501648
+    }
+  },
+  "routers": [
+    {
+      "router": "oracle",
+      "n": 600,
+      "task_acc": 1.0,
+      "answer_acc_strict": 0.5116666666666667,
+      "answer_acc_given_correct_route": 0.5116666666666667,
+      "confusion": [
+        [
+          200,
+          0,
+          0
+        ],
+        [
+          0,
+          200,
+          0
+        ],
+        [
+          0,
+          0,
+          200
+        ]
+      ],
+      "confusion_labels": [
+        "boolq",
+        "ruletaker",
+        "arc"
+      ]
+    },
+    {
+      "router": "naive_max_conf",
+      "n": 600,
+      "task_acc": 0.26,
+      "answer_acc_strict": 0.16166666666666665,
+      "answer_acc_given_correct_route": 0.6217948717948718,
+      "confusion": [
+        [
+          52,
+          113,
+          35
+        ],
+        [
+          53,
+          104,
+          43
+        ],
+        [
+          14,
+          186,
+          0
+        ]
+      ],
+      "confusion_labels": [
+        "boolq",
+        "ruletaker",
+        "arc"
+      ],
+      "abstain_thresh": 0.7,
+      "keep_rate": 0.9983333333333333,
+      "task_acc_kept": 0.2604340567612688,
+      "answer_acc_strict_kept": 0.16193656093489148
+    },
+    {
+      "router": "mahalanobis",
+      "n": 600,
+      "task_acc": 1.0,
+      "answer_acc_strict": 0.5116666666666667,
+      "answer_acc_given_correct_route": 0.5116666666666667,
+      "confusion": [
+        [
+          200,
+          0,
+          0
+        ],
+        [
+          0,
+          200,
+          0
+        ],
+        [
+          0,
+          0,
+          200
+        ]
+      ],
+      "confusion_labels": [
+        "boolq",
+        "ruletaker",
+        "arc"
+      ],
+      "abstain_thresh": 0.7,
+      "keep_rate": 1.0,
+      "task_acc_kept": 1.0,
+      "answer_acc_strict_kept": 0.5116666666666667
+    },
+    {
+      "router": "task_id_linear",
+      "n": 600,
+      "task_acc": 1.0,
+      "answer_acc_strict": 0.5116666666666667,
+      "answer_acc_given_correct_route": 0.5116666666666667,
+      "confusion": [
+        [
+          200,
+          0,
+          0
+        ],
+        [
+          0,
+          200,
+          0
+        ],
+        [
+          0,
+          0,
+          200
+        ]
+      ],
+      "confusion_labels": [
+        "boolq",
+        "ruletaker",
+        "arc"
+      ],
+      "abstain_thresh": 0.7,
+      "keep_rate": 1.0,
+      "task_acc_kept": 1.0,
+      "answer_acc_strict_kept": 0.5116666666666667
+    },
+    {
+      "router": "task_id_mlp",
+      "n": 600,
+      "task_acc": 1.0,
+      "answer_acc_strict": 0.5116666666666667,
+      "answer_acc_given_correct_route": 0.5116666666666667,
+      "confusion": [
+        [
+          200,
+          0,
+          0
+        ],
+        [
+          0,
+          200,
+          0
+        ],
+        [
+          0,
+          0,
+          200
+        ]
+      ],
+      "confusion_labels": [
+        "boolq",
+        "ruletaker",
+        "arc"
+      ],
+      "abstain_thresh": 0.7,
+      "keep_rate": 1.0,
+      "task_acc_kept": 1.0,
+      "answer_acc_strict_kept": 0.5116666666666667
+    }
+  ],
+  "per_task_breakdown": {
+    "naive_max_conf": {
+      "boolq": {
+        "task_acc": 0.26,
+        "answer_when_self": 0.6730769230769231,
+        "mean_conf_by_head": {
+          "boolq": 0.8992838859558105,
+          "ruletaker": 0.9292370676994324,
+          "arc": 0.8773353099822998
+        },
+        "route_hist": {
+          "boolq": 52,
+          "ruletaker": 113,
+          "arc": 35
+        }
+      },
+      "ruletaker": {
+        "task_acc": 0.52,
+        "answer_when_self": 0.5961538461538461,
+        "mean_conf_by_head": {
+          "boolq": 0.8675220012664795,
+          "ruletaker": 0.9053669571876526,
+          "arc": 0.8606253266334534
+        },
+        "route_hist": {
+          "boolq": 53,
+          "ruletaker": 104,
+          "arc": 43
+        }
+      },
+      "arc": {
+        "task_acc": 0.0,
+        "answer_when_self": NaN,
+        "mean_conf_by_head": {
+          "boolq": 0.9828187823295593,
+          "ruletaker": 0.999991238117218,
+          "arc": 0.7956039309501648
+        },
+        "route_hist": {
+          "boolq": 14,
+          "ruletaker": 186,
+          "arc": 0
+        }
+      }
+    },
+    "task_id_linear": {
+      "boolq": {
+        "task_acc": 1.0,
+        "answer_when_self": 0.685,
+        "mean_conf_by_head": {
+          "boolq": 0.8992838859558105,
+          "ruletaker": 0.9292370676994324,
+          "arc": 0.8773353099822998
+        },
+        "route_hist": {
+          "boolq": 200,
+          "ruletaker": 0,
+          "arc": 0
+        }
+      },
+      "ruletaker": {
+        "task_acc": 1.0,
+        "answer_when_self": 0.595,
+        "mean_conf_by_head": {
+          "boolq": 0.8675220012664795,
+          "ruletaker": 0.9053669571876526,
+          "arc": 0.8606253266334534
+        },
+        "route_hist": {
+          "boolq": 0,
+          "ruletaker": 200,
+          "arc": 0
+        }
+      },
+      "arc": {
+        "task_acc": 1.0,
+        "answer_when_self": 0.255,
+        "mean_conf_by_head": {
+          "boolq": 0.9828187823295593,
+          "ruletaker": 0.999991238117218,
+          "arc": 0.7956039309501648
+        },
+        "route_hist": {
+          "boolq": 0,
+          "ruletaker": 0,
+          "arc": 200
+        }
+      }
+    }
+  },
+  "oracle_answer_acc": 0.5116666666666667
+}

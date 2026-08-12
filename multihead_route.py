@@ -353,6 +353,11 @@ def main():
     ap.add_argument("--max-val", type=int, default=200)
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--device", default=None, help="cuda|mps|cpu (auto if omit)")
+    ap.add_argument("--layer", type=int, default=None,
+                    help="residual/head layer to use (default: infer from cached heads)")
+    ap.add_argument("--refit-heads", action="store_true",
+                    help="force ALL answer heads to be refit on the pilot train "
+                         "(uniform protocol; do not load cached head artifacts)")
     ap.add_argument("--out", default=None, help="results json path")
     args = ap.parse_args()
 
@@ -371,7 +376,7 @@ def main():
 
     # Load model only if any residual bank is missing
     model = tok = None
-    layer = None
+    layer = args.layer
 
     def need_model():
         nonlocal model, tok, layer
@@ -379,18 +384,20 @@ def main():
             return
         print(f"loading {resolve_model(args.size)} on {device}...")
         model, tok = load_model(args.size, device=device)
-        layer = discover_layers(model) - 1
-        print(f"  n_layers={discover_layers(model)} last_layer={layer}")
+        if layer is None:
+            layer = discover_layers(model) - 1
+            print(f"  n_layers={discover_layers(model)} last_layer={layer}")
 
-    # Infer layer from existing heads if possible
-    for t in TASKS:
-        for L in (27, 35, 42):
-            p = find_head(args.size, t, L)
-            if p:
-                layer = L
+    # Infer layer from existing heads if not given explicitly
+    if layer is None:
+        for t in TASKS:
+            for L in (27, 35, 42):
+                p = find_head(args.size, t, L)
+                if p:
+                    layer = L
+                    break
+            if layer is not None:
                 break
-        if layer is not None:
-            break
 
     banks = {}
     for t in TASKS:
@@ -403,10 +410,10 @@ def main():
             batch=args.batch,
         )
         if cached is None and t == "arc":
-            # try full ARC at layer 27
+            # try full ARC cache at the requested layer
             cached_full = load_cached_vectors(
                 1117, 1165, ["last_tr", "last_va", "ytr", "yva"],
-                cache_dir=dirs["cache"], layer=27, batch=args.batch)
+                cache_dir=dirs["cache"], layer=layer, batch=args.batch)
             if cached_full is not None and layer is None:
                 layer = 27
         if cached is None:
@@ -443,7 +450,7 @@ def main():
     # Load or refit answer heads
     heads = {}
     for t in TASKS:
-        path = find_head(args.size, t, layer)
+        path = find_head(args.size, t, layer) if not args.refit_heads else None
         n_cls = 4 if t == "arc" else 2
         if path is not None:
             print(f"  [{t}] head {path}")
@@ -456,7 +463,8 @@ def main():
                     banks[t]["last_va"], banks[t]["yva"],
                     n_cls, probe_dev)
         else:
-            print(f"  [{t}] no saved head — refitting on pilot train")
+            why = "forced --refit-heads" if args.refit_heads else "no saved head"
+            print(f"  [{t}] {why} — refitting on pilot train")
             heads[t] = fit_answer_head_local(
                 banks[t]["last_tr"], banks[t]["ytr"],
                 banks[t]["last_va"], banks[t]["yva"],
@@ -618,6 +626,8 @@ def main():
             "n_mixed_val": n,
             "tasks": list(TASKS),
             "heads": {t: heads[t]["path"] for t in TASKS},
+            "head_protocol": "refit-on-pilot-train" if args.refit_heads
+                             else "cached-or-refit",
             "chance_task_acc": chance_task,
         },
         "cross_task_answer": cross,

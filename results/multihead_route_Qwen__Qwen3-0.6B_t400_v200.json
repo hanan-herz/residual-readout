@@ -12,35 +12,35 @@
       "arc"
     ],
     "heads": {
-      "boolq": "results/head_Qwen_Qwen3-0.6B_l27.npz",
-      "ruletaker": "cloud_bench_cache/Qwen__Qwen3-0.6B/ruletaker/heads/head_l27.npz",
-      "arc": "cloud_bench_cache/Qwen__Qwen3-0.6B/arc/heads/head_l27.npz"
+      "boolq": "(refit)",
+      "ruletaker": "/Users/hanan/projects/ai/vector-is-the-answer/cloud_bench_cache/Qwen__Qwen3-0.6B/ruletaker/heads/head_l27.npz",
+      "arc": "/Users/hanan/projects/ai/vector-is-the-answer/cloud_bench_cache/Qwen__Qwen3-0.6B/arc/heads/head_l27.npz"
     },
     "chance_task_acc": 0.3333333333333333
   },
   "cross_task_answer": {
     "boolq": {
       "boolq": {
-        "acc": 0.765,
-        "mean_conf": 0.8809872269630432,
+        "acc": 0.665,
+        "mean_conf": 0.9159622192382812,
         "n": 200
       },
       "ruletaker": {
-        "acc": 0.565,
-        "mean_conf": 0.9040303826332092,
+        "acc": 0.51,
+        "mean_conf": 0.9971082210540771,
         "n": 200
       },
       "arc": null
     },
     "ruletaker": {
       "boolq": {
-        "acc": 0.61,
-        "mean_conf": 0.9183018207550049,
+        "acc": 0.625,
+        "mean_conf": 0.9470745921134949,
         "n": 200
       },
       "ruletaker": {
         "acc": 0.65,
-        "mean_conf": 0.8791607618331909,
+        "mean_conf": 0.8888137936592102,
         "n": 200
       },
       "arc": null
@@ -49,27 +49,27 @@
       "boolq": null,
       "ruletaker": null,
       "arc": {
-        "acc": 0.46,
-        "mean_conf": 0.8441652655601501,
+        "acc": 0.505,
+        "mean_conf": 0.8408887982368469,
         "n": 200
       }
     }
   },
   "confidence_matrix": {
     "boolq": {
-      "boolq": 0.8809872269630432,
-      "ruletaker": 0.9040303826332092,
-      "arc": 0.9103840589523315
+      "boolq": 0.9159622192382812,
+      "ruletaker": 0.9971082210540771,
+      "arc": 0.8825105428695679
     },
     "ruletaker": {
-      "boolq": 0.9183018207550049,
-      "ruletaker": 0.8791607618331909,
-      "arc": 0.9944043755531311
+      "boolq": 0.9470745921134949,
+      "ruletaker": 0.8888137936592102,
+      "arc": 0.9895647168159485
     },
     "arc": {
-      "boolq": 0.9686492085456848,
-      "ruletaker": 0.8607818484306335,
-      "arc": 0.8441652655601501
+      "boolq": 0.8869950771331787,
+      "ruletaker": 0.8464285135269165,
+      "arc": 0.8408887982368469
     }
   },
   "routers": [
@@ -77,8 +77,8 @@
       "router": "oracle",
       "n": 600,
       "task_acc": 1.0,
-      "answer_acc_strict": 0.625,
-      "answer_acc_given_correct_route": 0.625,
+      "answer_acc_strict": 0.6066666666666667,
+      "answer_acc_given_correct_route": 0.6066666666666667,
       "confusion": [
         [
           200,
@@ -105,24 +105,24 @@
     {
       "router": "naive_max_conf",
       "n": 600,
-      "task_acc": 0.16166666666666665,
-      "answer_acc_strict": 0.13,
-      "answer_acc_given_correct_route": 0.8041237113402062,
+      "task_acc": 0.14166666666666666,
+      "answer_acc_strict": 0.11833333333333333,
+      "answer_acc_given_correct_route": 0.8352941176470589,
       "confusion": [
         [
-          35,
-          72,
-          93
+          56,
+          119,
+          25
         ],
         [
-          93,
-          56,
-          51
+          183,
+          17,
+          0
         ],
         [
           8,
-          186,
-          6
+          180,
+          12
         ]
       ],
       "confusion_labels": [
@@ -132,15 +132,15 @@
       ],
       "abstain_thresh": 0.7,
       "keep_rate": 1.0,
-      "task_acc_kept": 0.16166666666666665,
-      "answer_acc_strict_kept": 0.13
+      "task_acc_kept": 0.14166666666666666,
+      "answer_acc_strict_kept": 0.11833333333333333
     },
     {
       "router": "mahalanobis",
       "n": 600,
       "task_acc": 0.995,
-      "answer_acc_strict": 0.6233333333333333,
-      "answer_acc_given_correct_route": 0.626465661641541,
+      "answer_acc_strict": 0.605,
+      "answer_acc_given_correct_route": 0.6080402010050251,
       "confusion": [
         [
           197,
@@ -166,14 +166,14 @@
       "abstain_thresh": 0.7,
       "keep_rate": 1.0,
       "task_acc_kept": 0.995,
-      "answer_acc_strict_kept": 0.6233333333333333
+      "answer_acc_strict_kept": 0.605
     },
     {
       "router": "task_id_linear",
       "n": 600,
       "task_acc": 0.9966666666666667,
-      "answer_acc_strict": 0.6233333333333333,
-      "answer_acc_given_correct_route": 0.6254180602006689,
+      "answer_acc_strict": 0.605,
+      "answer_acc_given_correct_route": 0.6070234113712375,
       "confusion": [
         [
           198,
@@ -199,14 +199,14 @@
       "abstain_thresh": 0.7,
       "keep_rate": 1.0,
       "task_acc_kept": 0.9966666666666667,
-      "answer_acc_strict_kept": 0.6233333333333333
+      "answer_acc_strict_kept": 0.605
     },
     {
       "router": "task_id_mlp",
       "n": 600,
       "task_acc": 0.9966666666666667,
-      "answer_acc_strict": 0.6233333333333333,
-      "answer_acc_given_correct_route": 0.6254180602006689,
+      "answer_acc_strict": 0.605,
+      "answer_acc_given_correct_route": 0.6070234113712375,
       "confusion": [
         [
           198,
@@ -232,62 +232,62 @@
       "abstain_thresh": 0.7,
       "keep_rate": 0.9983333333333333,
       "task_acc_kept": 0.998330550918197,
-      "answer_acc_strict_kept": 0.6243739565943238
+      "answer_acc_strict_kept": 0.6060100166944908
     }
   ],
   "per_task_breakdown": {
     "naive_max_conf": {
       "boolq": {
-        "task_acc": 0.175,
-        "answer_when_self": 0.9142857142857143,
+        "task_acc": 0.28,
+        "answer_when_self": 0.8035714285714286,
         "mean_conf_by_head": {
-          "boolq": 0.8809872269630432,
-          "ruletaker": 0.9183018207550049,
-          "arc": 0.9686492085456848
+          "boolq": 0.9159622192382812,
+          "ruletaker": 0.9470745921134949,
+          "arc": 0.8869950771331787
         },
         "route_hist": {
-          "boolq": 35,
-          "ruletaker": 72,
-          "arc": 93
+          "boolq": 56,
+          "ruletaker": 119,
+          "arc": 25
         }
       },
       "ruletaker": {
-        "task_acc": 0.28,
-        "answer_when_self": 0.7321428571428571,
+        "task_acc": 0.085,
+        "answer_when_self": 0.9411764705882353,
         "mean_conf_by_head": {
-          "boolq": 0.9040303826332092,
-          "ruletaker": 0.8791607618331909,
-          "arc": 0.8607818484306335
+          "boolq": 0.9971082210540771,
+          "ruletaker": 0.8888137936592102,
+          "arc": 0.8464285135269165
         },
         "route_hist": {
-          "boolq": 93,
-          "ruletaker": 56,
-          "arc": 51
+          "boolq": 183,
+          "ruletaker": 17,
+          "arc": 0
         }
       },
       "arc": {
-        "task_acc": 0.03,
+        "task_acc": 0.06,
         "answer_when_self": 0.8333333333333334,
         "mean_conf_by_head": {
-          "boolq": 0.9103840589523315,
-          "ruletaker": 0.9944043755531311,
-          "arc": 0.8441652655601501
+          "boolq": 0.8825105428695679,
+          "ruletaker": 0.9895647168159485,
+          "arc": 0.8408887982368469
         },
         "route_hist": {
           "boolq": 8,
-          "ruletaker": 186,
-          "arc": 6
+          "ruletaker": 180,
+          "arc": 12
         }
       }
     },
     "task_id_linear": {
       "boolq": {
         "task_acc": 0.99,
-        "answer_when_self": 0.7676767676767676,
+        "answer_when_self": 0.6666666666666666,
         "mean_conf_by_head": {
-          "boolq": 0.8809872269630432,
-          "ruletaker": 0.9183018207550049,
-          "arc": 0.9686492085456848
+          "boolq": 0.9159622192382812,
+          "ruletaker": 0.9470745921134949,
+          "arc": 0.8869950771331787
         },
         "route_hist": {
           "boolq": 198,
@@ -299,9 +299,9 @@
         "task_acc": 1.0,
         "answer_when_self": 0.65,
         "mean_conf_by_head": {
-          "boolq": 0.9040303826332092,
-          "ruletaker": 0.8791607618331909,
-          "arc": 0.8607818484306335
+          "boolq": 0.9971082210540771,
+          "ruletaker": 0.8888137936592102,
+          "arc": 0.8464285135269165
         },
         "route_hist": {
           "boolq": 0,
@@ -311,11 +311,11 @@
       },
       "arc": {
         "task_acc": 1.0,
-        "answer_when_self": 0.46,
+        "answer_when_self": 0.505,
         "mean_conf_by_head": {
-          "boolq": 0.9103840589523315,
-          "ruletaker": 0.9944043755531311,
-          "arc": 0.8441652655601501
+          "boolq": 0.8825105428695679,
+          "ruletaker": 0.9895647168159485,
+          "arc": 0.8408887982368469
         },
         "route_hist": {
           "boolq": 0,
@@ -325,5 +325,5 @@
       }
     }
   },
-  "oracle_answer_acc": 0.625
+  "oracle_answer_acc": 0.6066666666666667
 }
