@@ -113,6 +113,67 @@ SHUFFLE = {
 CONDITIONS = ["Identity", "Word shuffle", "Token shuffle"]
 
 
+def plot_adaptive_path():
+    tasks = ["BoolQ", "RuleTaker", "ARC"]
+    adaptive = [0.870, 0.760, 0.915]
+    shared = [0.8475, 0.725, 0.915]
+    taps = ["L30", "L24", "L35"]
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.8),
+                             gridspec_kw={"width_ratios": [1.7, 1]})
+    fig.subplots_adjust(left=0.08, right=0.98, bottom=0.18, top=0.82,
+                        wspace=0.28)
+    x = np.arange(len(tasks))
+    width = 0.34
+    bars_a = axes[0].bar(x - width / 2, adaptive, width,
+                         label="Adaptive task tap", color="#2c7fb8")
+    bars_s = axes[0].bar(x + width / 2, shared, width,
+                         label="Shared L35", color="#bdbdbd")
+    _label_bars(axes[0], [bars_a, bars_s], decimals=3, fontsize=7)
+    for xi, tap in zip(x, taps):
+        axes[0].text(xi - width / 2, 0.03, tap, ha="center", va="bottom",
+                     fontsize=8, color="white", fontweight="bold")
+    axes[0].set_title("Per-task answer accuracy", fontsize=11)
+    axes[0].set_ylabel("Answer accuracy", fontsize=9)
+    axes[0].set_xticks(x)
+    axes[0].set_xticklabels(tasks, fontsize=9)
+    axes[0].set_ylim(0.65, 1.0)
+    axes[0].legend(fontsize=8, loc="lower right")
+    axes[0].grid(axis="y", alpha=0.25, linewidth=0.6)
+
+    depth_labels = ["BoolQ", "RuleTaker", "ARC", "Average"]
+    depth = [30, 24, 35, 30.67]
+    colors = ["#2c7fb8", "#2c7fb8", "#2c7fb8", "#222222"]
+    bars_d = axes[1].bar(np.arange(4), depth, color=colors, width=0.6)
+    for bar, value in zip(bars_d, depth):
+        axes[1].text(bar.get_x() + bar.get_width() / 2, value + 0.4,
+                     f"{value:.1f}" if value != 30 else "30",
+                     ha="center", va="bottom", fontsize=8)
+    axes[1].axhline(36, color="#666", linestyle="--", linewidth=0.9)
+    axes[1].text(3.42, 36.3, "full L35 = 36 blocks", ha="right",
+                 fontsize=7, color="#555")
+    axes[1].set_title("Executed depth", fontsize=11)
+    axes[1].set_ylabel("Transformer blocks", fontsize=9)
+    axes[1].set_xticks(np.arange(4))
+    axes[1].set_xticklabels(depth_labels, fontsize=8)
+    axes[1].set_ylim(0, 40)
+    axes[1].grid(axis="y", alpha=0.25, linewidth=0.6)
+
+    fig.suptitle(
+        "Adaptive 8B serving path: route at L1, stop at each task's optimum",
+        fontsize=12,
+        y=1.03,
+    )
+    fig.text(0.5, 0.015,
+             "Mixed accuracy: 0.829 shared L35 → 0.849 with the supervised L1 router; "
+             "average depth = 85.2% of full",
+             ha="center", fontsize=8.5, color="#444")
+    path = OUT / "multihead_adaptive_path.png"
+    fig.savefig(path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    print(path)
+
+
 def plot_shuffle_comparison():
     fig, axes = plt.subplots(1, 2, figsize=(12, 5.0), sharey=True)
     x = np.arange(len(CONDITIONS))
@@ -162,4 +223,5 @@ def plot_shuffle_comparison():
 
 if __name__ == "__main__":
     plot_scale_comparison()
+    plot_adaptive_path()
     plot_shuffle_comparison()

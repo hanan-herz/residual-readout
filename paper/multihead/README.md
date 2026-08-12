@@ -8,11 +8,13 @@ single-head paper figures under `paper/figures/`.
 
 - `figures/multihead_scale_comparison.png` — clean routing and answer
   accuracy for Qwen3-0.6B vs Qwen3-8B.
+- `figures/multihead_adaptive_path.png` — per-task answer accuracy and
+  executed depth for the adaptive 8B serving path.
 - `figures/multihead_shuffle_layers.png` — shuffle robustness for the
   supervised task-ID probe and Mahalanobis router.
 - `plot_multihead.py` — deterministic figure generator.
 
-Regenerate both figures from the repository root with:
+Regenerate all three figures from the repository root with:
 
 ```bash
 python paper/multihead/plot_multihead.py

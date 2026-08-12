@@ -14,14 +14,34 @@ This is the serving-composition question on top of the paper's single-head
 claim: given a registry of heads over the same residual space, how cheaply
 can we route to the right one?
 
+## At a glance: verified 8B adaptive path
+
+Matched 8B pilot: 1,000 training and 400 validation examples per task,
+1,200 mixed validation examples. The L1 router selects the task-specific
+answer tap (BoolQ L30, RuleTaker L24, ARC L35) and is compared with a shared
+L35 path.
+
+| router | task accuracy | adaptive answer accuracy | shared L35 answer accuracy |
+|---|---:|---:|---:|
+| gold task ceiling | 1.000 | 0.848 | 0.829 |
+| **task-ID linear (L1)** | **0.998** | **0.849** | 0.829 |
+| Mahalanobis (L1) | 1.000 | 0.848 | 0.829 |
+
+The adaptive path gains **1.9 points** on mixed answer accuracy while using
+30.7/36 transformer blocks on average (**85.2% depth**, a depth/FLOP proxy).
+Mahalanobis is retained as the training-free comparison: it matches the
+supervised probe on clean traffic, but the shuffle control shows that its L1
+geometry is fragile off-manifold. The supervised L1 probe is therefore the
+practical default.
+
 ## Routers compared
 
 | router | signal | deployable? |
 |---|---|---|
 | `gold_task_ceiling` | gold task label | no — analytical upper bound only |
 | `naive_max_conf` | highest *answer* confidence across heads | yes, but fails |
-| `mahalanobis` | nearest per-task train-residual manifold | yes, unsupervised |
-| `task_id_linear` / `task_id_mlp` | trained probe: which task is this | yes, needs task labels |
+| `mahalanobis` | nearest per-task train-residual manifold | yes; training-free comparison, clean-input only |
+| `task_id_linear` / `task_id_mlp` | trained probe: which task is this | yes; practical default, needs task labels |
 
 ## Findings
 
@@ -77,10 +97,11 @@ Layer-1 residuals re-extracted on shuffled prompts (t400/v200):
 
 A trained probe separates tasks at ~0.91 even from a bag of tokens — the
 signal is order-free **lexical content**, not sequential or template
-structure. Mahalanobis collapses: its manifold geometry is built largely
-from sequential structure. **Implication for deployment: route with the
-trained task-ID probe; Mahalanobis is fine on real inputs but its perfect
-score measures a more brittle signal.**
+structure. Mahalanobis is retained as a training-free comparison: it performs
+well on clean closed-set traffic, but its L1 geometry is fragile under order
+scrambling. **Implication for deployment: use the trained task-ID probe as the
+practical default; keep Mahalanobis as the zero-training extensibility
+baseline, not as the general OOD router.**
 
 ### 6. Per-task depth optima do not coincide (full-val layer sweeps)
 
@@ -203,6 +224,9 @@ accuracy gain is broad: earlier task-specific taps improve BoolQ and
 RuleTaker, while ARC appropriately runs to the final layer. This is a
 measured depth proxy, not a wall-clock latency benchmark; actual savings
 also depend on batching, scheduling, and implementation overhead.
+
+Artifact: `results/multihead_adaptive_Qwen__Qwen3-8B_t1000_v400.json`.
+Figure: `paper/multihead/figures/multihead_adaptive_path.png`.
 
 ## Caveats
 
