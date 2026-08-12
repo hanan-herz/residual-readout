@@ -17,6 +17,9 @@ single-head paper figures under `paper/figures/`.
 - `deployment-analysis.md` — systems/commercial analysis of direct
   readouts, adaptive depth, batching, and the required production benchmark.
 
+Broader follow-on ideas are recorded separately in
+`paper/research-directions/latent-computation.md`.
+
 Regenerate all three figures from the repository root with:
 
 ```bash
