@@ -448,24 +448,30 @@ def _remote_body(layer: int, mode: str, size: str,
               volumes={VOLUME_MOUNT: bench_volume,
                        WEIGHTS_MOUNT: weights_volume},
               gpu="A100-80GB", timeout=3 * 60 * 60, cpu=16.0, memory=65536)
-def run_pilot(size="8B", layer=35, max_train=1000, max_val=400, batch=16):
-    return _remote_body(layer, "pilot", size, max_train, max_val, batch, None)
+def run_multihead(mode: str, size="8B", layer=35, max_train=1000,
+                  max_val=400, batch=16):
+    """Single entrypoint (bench.py pattern): one function, mode selects.
 
-
-@app.function(image=image,
-              volumes={VOLUME_MOUNT: bench_volume,
-                       WEIGHTS_MOUNT: weights_volume},
-              gpu="A100-80GB", timeout=3 * 60 * 60, cpu=16.0, memory=65536)
-def run_embed(size="8B", max_train=1000, max_val=400, batch=16):
-    return _remote_body(-1, "embed", size, max_train, max_val, batch, None)
-
-
-@app.function(image=image,
-              volumes={VOLUME_MOUNT: bench_volume,
-                       WEIGHTS_MOUNT: weights_volume},
-              gpu="A100-80GB", timeout=3 * 60 * 60, cpu=16.0, memory=65536)
-def run_shuffle(size="8B", layer=1, max_train=400, max_val=200, batch=16):
-    return _remote_body(layer, "shuffle", size, max_train, max_val, batch,
+    mode: pilot | embed | shuffle | all
+    "all" runs pilot -> embed -> shuffle sequentially in ONE container,
+    so the model is loaded once and reused across modes.
+    """
+    if mode == "all":
+        return {
+            "pilot": _remote_body(layer, "pilot", size, max_train, max_val,
+                                  batch, None),
+            "embed": _remote_body(-1, "embed", size, max_train, max_val,
+                                  batch, None),
+            "shuffle": _remote_body(1, "shuffle", size, 400, 200, batch,
+                                    None),
+        }
+    if mode == "embed":
+        return _remote_body(-1, "embed", size, max_train, max_val, batch,
+                              None)
+    if mode == "shuffle":
+        return _remote_body(layer, "shuffle", size, max_train, max_val,
+                            batch, None)
+    return _remote_body(layer, "pilot", size, max_train, max_val, batch,
                         None)
 
 
@@ -494,18 +500,19 @@ def main():
     args = ap.parse_args()
 
     with app.run():
-        if args.which in ("pilot", "all"):
-            _show("pilot", run_pilot.remote(size=args.size, layer=args.layer,
-                                            max_train=args.max_train,
-                                            max_val=args.max_val))
-        if args.which in ("embed", "all"):
-            _show("embed", run_embed.remote(size=args.size,
-                                            max_train=args.max_train,
-                                            max_val=args.max_val))
-        if args.which in ("shuffle", "all"):
-            _show("shuffle", run_shuffle.remote(size=args.size,
-                                                layer=1, max_train=400,
-                                                max_val=200))
+        if args.which == "all":
+            out = run_multihead.remote("all", size=args.size,
+                                       layer=args.layer,
+                                       max_train=args.max_train,
+                                       max_val=args.max_val)
+            for name in ("pilot", "embed", "shuffle"):
+                _show(name, out[name])
+        else:
+            _show(args.which,
+                  run_multihead.remote(args.which, size=args.size,
+                                       layer=args.layer,
+                                       max_train=args.max_train,
+                                       max_val=args.max_val))
 
 
 if __name__ == "__main__":

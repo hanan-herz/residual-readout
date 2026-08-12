@@ -127,18 +127,32 @@ Routing ≈ ceiling at 8B too; task-ID perfect; naive max-conf still fails
 mahalanobis 0.340, ceiling ans 0.465) — separation is created by the
 first transformer block at both scales.
 
-8B shuffle control (L1, t400/v200):
+8B shuffle control. Two layers measured to test whether the
+order-fragility of the unsupervised router is a layer effect:
 
-| condition | linear | maha | (0.6B linear / maha) |
-|---|---|---|---|
-| identity | 0.997 | 1.000 | 1.000 / 1.000 |
-| word_shuffle | 0.997 | 0.933 | 0.908 / 0.465 |
-| token_shuffle | 0.970 | 0.385 | 0.912 / 0.450 |
+| layer | condition | linear | maha | (0.6B L1 linear / maha) |
+|---|---|---|---|---|
+| L1 | identity | 0.997 | 1.000 | 1.000 / 1.000 |
+| L1 | word_shuffle | 0.997 | 0.935 | 0.908 / 0.465 |
+| L1 | token_shuffle | 0.970 | 0.387 | 0.912 / 0.450 |
+| L35 | identity | 1.000 | 0.997 | — |
+| L35 | word_shuffle | 0.999 | 0.884 | — |
+| L35 | token_shuffle | 0.998 | 0.939 | — |
 
-The probe is nearly fully order-invariant at 8B (0.997→0.997→0.970) —
-content-not-format strengthens with scale. Mahalanobis survives
-word-shuffle at 8B (0.933) but still collapses under token-shuffle
-(0.385): manifold geometry remains order-fragile at both scales.
+The supervised linear probe is nearly fully order-invariant at 8B
+(0.997→0.997→0.970 at L1; 1.000→0.999→0.998 at L35) — content-not-format
+strengthens with scale.
+
+Mahalanobis order-fragility is a **layer** effect, not a scale effect. At
+L1 the unsupervised router collapses under full token-shuffle (0.387,
+near chance 0.333) at 8B just as it did at 0.6B (0.450): the early-layer
+manifold encodes token order/position, so a bag-of-shuffled-tokens input
+lands off-manifold. At L35 the same router is order-robust (0.939) —
+deeper residual geometry becomes order-invariant. Practical consequence:
+an unsupervised L1 router works for clean inputs but cannot be trusted to
+route arbitrary/OOD text; if order-robust routing is required, route from
+a deeper tap (or use the supervised probe, which is order-robust at any
+layer).
 
 ## Caveats
 
