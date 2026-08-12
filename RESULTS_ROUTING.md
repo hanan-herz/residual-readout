@@ -110,12 +110,46 @@ no KV-cache, router ~0 cost. Heads are portable artifacts scoped to
 — a new task means training its answer head and caching a few hundred
 residuals for the routing distribution.
 
+### 7. Cross-scale replication: Qwen3-8B (Modal A100-80GB)
+
+Pilot at L35, t1000/v400 (`modal_multihead.py`, uniform refit heads):
+
+| router | 8B | 0.6B (L27 pilot) |
+|---|---|---|
+| gold_task_ceiling | 1.000 / **0.830** | 1.000 / 0.607 |
+| task_id_linear | **1.000** / 0.830 | 0.997 / 0.605 |
+| mahalanobis | **0.997** / 0.830 | 0.995 / 0.605 |
+| naive_max_conf | 0.577 / 0.780 | 0.142 / 0.118 |
+
+Routing ≈ ceiling at 8B too; task-ID perfect; naive max-conf still fails
+(better calibrated than 0.6B but far from usable). Embedding control at
+8B also replicates: routing at layer 0 is chance (task-ID 0.340,
+mahalanobis 0.340, ceiling ans 0.465) — separation is created by the
+first transformer block at both scales.
+
+8B shuffle control (L1, t400/v200):
+
+| condition | linear | maha | (0.6B linear / maha) |
+|---|---|---|---|
+| identity | 0.997 | 1.000 | 1.000 / 1.000 |
+| word_shuffle | 0.997 | 0.933 | 0.908 / 0.465 |
+| token_shuffle | 0.970 | 0.385 | 0.912 / 0.450 |
+
+The probe is nearly fully order-invariant at 8B (0.997→0.997→0.970) —
+content-not-format strengthens with scale. Mahalanobis survives
+word-shuffle at 8B (0.933) but still collapses under token-shuffle
+(0.385): manifold geometry remains order-fragile at both scales.
+
 ## Caveats
 
 - Single model (Qwen3-0.6B), small pilot sizes for sweep/controls
   (400 train / 200 val per task); big-N exists only for L23/L27.
 - Task-ID router is closed-set: no abstain. Open-world inputs silently
   route to the nearest task — see `gate_ar.py` for the coveredness gate.
+- Cross-scale: pilot-level findings replicated at 8B (section 7); depth
+  sweep and shuffle controls replicated at 8B pending.
+- 8B per-task depth optima from full sweeps: BoolQ L30, RuleTaker L24,
+  ARC L35 — the same "optima do not coincide" pattern as 0.6B.
 - BoolQ/RuleTaker L18 peaks vs L27 are ~1–4pt at full val — real-looking
   and consistent across two tasks, but modest.
 - `multihead_route.py` confusion plumbing is hardcoded to 3 tasks
