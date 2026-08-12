@@ -4,6 +4,7 @@ Replicates the 0.6B exp/multihead-single-pass findings at a second scale:
   route_pilot       depth-sweep style pilot at one tap layer (default L35)
   embed_control     is task separation present at the embedding (layer 0)?
   shuffle_control   word/token-shuffle at L1: format vs content
+  adaptive_path     L1 routing to task-specific optimal answer taps
 
 Self-contained (helpers inlined) because the Modal image only ships
 bench.py/common.py/probe_main.py/tasks. Residuals cache into the
@@ -14,6 +15,7 @@ Run (from repo root):
   python modal_multihead.py pilot            --layer 35
   python modal_multihead.py embed
   python modal_multihead.py shuffle          --layer 1
+  python modal_multihead.py adaptive
   python modal_multihead.py all              (sequential)
 """
 from __future__ import annotations
@@ -172,6 +174,44 @@ def _remote_body(layer: int, mode: str, size: str,
                 print(f"  [{label}] {min(i+batch,len(texts))}/{len(texts)}",
                       flush=True)
         return torch.cat(last, 0).numpy().astype(np.float32)
+
+    def extract_layers(model, tok, texts, layers, batch, label):
+        """Capture several layer taps in one forward pass per batch."""
+        dev = model.device
+        layers = tuple(sorted(set(layers)))
+        outputs = {layer: [] for layer in layers}
+        for i in range(0, len(texts), batch):
+            sub = texts[i:i + batch]
+            enc = tok(sub, return_tensors="pt", padding=True,
+                      truncation=True, max_length=PAD_MAX).to(dev)
+            bufs = {layer: [] for layer in layers}
+
+            def make_hook(layer):
+                def hook(m, inp, o):
+                    if isinstance(o, tuple):
+                        o = o[0]
+                    bufs[layer].append(o.flatten(2).detach().float().cpu())
+                return hook
+
+            hooks = [model.model.layers[layer].register_forward_hook(
+                make_hook(layer)) for layer in layers]
+            with torch.no_grad():
+                model(**enc)
+            for hook in hooks:
+                hook.remove()
+            am = enc["attention_mask"].cpu()
+            lens = am.shape[1] - 1 - am.flip(1).argmax(1)
+            rows = torch.arange(len(sub))
+            for layer in layers:
+                hs = bufs[layer][0]
+                outputs[layer].append(hs[rows, lens])
+            if (i // batch) % 40 == 39:
+                print(f"  [{label}] {min(i+batch,len(texts))}/{len(texts)}",
+                      flush=True)
+        return {
+            layer: torch.cat(outputs[layer], 0).numpy().astype(np.float32)
+            for layer in layers
+        }
 
     def extract_embed(model, tok, texts, batch, label):
         dev = model.device
@@ -339,6 +379,151 @@ def _remote_body(layer: int, mode: str, size: str,
                               pad_max=PAD_MAX, batch=batch)
         return banks
 
+    def banks_at_layers(layers):
+        """Extract/cache several taps per task with one forward per batch."""
+        nonlocal model, tok
+        layers = tuple(sorted(set(layers)))
+        banks = {t: {} for t in TASKS}
+        for t in TASKS:
+            dirs = task_dirs(VOLUME_MOUNT, size, t)
+            loaded = True
+            for layer_ in layers:
+                cached = load_cached_vectors(
+                    max_train, max_val,
+                    ["last_tr", "last_va", "ytr", "yva"],
+                    cache_dir=dirs["cache"], layer=layer_,
+                    pad_max=PAD_MAX, batch=batch)
+                if cached is None:
+                    loaded = False
+                    break
+                banks[t][layer_] = {
+                    "last_tr": cached["last_tr"].astype(np.float32),
+                    "last_va": cached["last_va"].astype(np.float32),
+                    "ytr": np.asarray(cached["ytr"]),
+                    "yva": np.asarray(cached["yva"]),
+                }
+            if loaded:
+                print(f"  [{t}] adaptive cache hit L{layers}", flush=True)
+                continue
+            if model is None:
+                weights_dir = os.path.join(WEIGHTS_MOUNT, model_slug(size))
+                print(f"  loading {resolve_model(size)} "
+                      f"(weights_dir={weights_dir}) ...", flush=True)
+                model, tok = load_model(size, device="cuda",
+                                        weights_dir=weights_dir)
+            t0 = time.time()
+            tr_layers = extract_layers(
+                model, tok, samples[t]["texts_tr"], layers, batch,
+                f"{t}.tr")
+            va_layers = extract_layers(
+                model, tok, samples[t]["texts_va"], layers, batch,
+                f"{t}.va")
+            for layer_ in layers:
+                banks[t][layer_] = {
+                    "last_tr": tr_layers[layer_],
+                    "last_va": va_layers[layer_],
+                    "ytr": samples[t]["ytr"],
+                    "yva": samples[t]["yva"],
+                }
+                cache_vectors(
+                    max_train, max_val,
+                    last_tr=tr_layers[layer_], last_va=va_layers[layer_],
+                    ytr=samples[t]["ytr"], yva=samples[t]["yva"],
+                    cache_dir=dirs["cache"], layer=layer_,
+                    pad_max=PAD_MAX, batch=batch)
+            print(f"  [{t}] adaptive extraction done in "
+                  f"{time.time()-t0:.0f}s", flush=True)
+        return banks
+
+    def adaptive_eval():
+        """Evaluate L1 routing into task-specific taps versus shared L35."""
+        if size != "8B":
+            raise ValueError("adaptive path is currently defined for 8B")
+        optimal = {"boolq": 30, "ruletaker": 24, "arc": 35}
+        full_layer = 35
+        layers = (1, 24, 30, 35)
+        banks = banks_at_layers(layers)
+
+        y_task = np.concatenate(
+            [np.full(len(banks[t][1]["last_va"]), i, dtype=np.int64)
+             for i, t in enumerate(TASKS)], 0)
+        y_ans = np.concatenate(
+            [banks[t][1]["yva"].astype(np.int64) for t in TASKS], 0)
+        Xtr_route = np.concatenate(
+            [banks[t][1]["last_tr"] for t in TASKS], 0)
+        ytr_task = np.concatenate(
+            [np.full(len(banks[t][1]["last_tr"]), i, dtype=np.int64)
+             for i, t in enumerate(TASKS)], 0)
+        Xva_route = np.concatenate(
+            [banks[t][1]["last_va"] for t in TASKS], 0)
+        val_by_layer = {
+            layer_: np.concatenate(
+                [banks[t][layer_]["last_va"] for t in TASKS], 0)
+            for layer_ in layers
+        }
+
+        sc, clf = fit_tid_linear(Xtr_route, ytr_task)
+        linear_route = clf.predict(sc.transform(Xva_route))
+        maha = {t: fit_maha(banks[t][1]["last_tr"]) for t in TASKS}
+        maha_scores = np.stack(
+            [maha_score(maha[t], Xva_route) for t in TASKS], 1)
+        maha_route = maha_scores.argmax(1)
+
+        def fit_heads(at_layer):
+            return {
+                t: fit_head(banks[t][at_layer[t]]["last_tr"],
+                            banks[t][at_layer[t]]["ytr"],
+                            4 if t == "arc" else 2)
+                for t in TASKS
+            }
+
+        def answer_breakdown(route, heads, at_layer):
+            ok = np.zeros(len(route), dtype=bool)
+            per_task = {}
+            for ti, t in enumerate(TASKS):
+                pick = route == ti
+                if pick.any():
+                    pred, _ = head_forward(
+                        heads[t], val_by_layer[at_layer[t]][pick])
+                    ok[pick] = pred == y_ans[pick]
+                true_task = y_task == ti
+                per_task[t] = float(ok[true_task].mean())
+            return float(ok.mean()), per_task
+
+        adaptive_heads = fit_heads(optimal)
+        shared_heads = fit_heads({t: full_layer for t in TASKS})
+        routes = {
+            "gold_task_ceiling": y_task,
+            "task_id_linear": linear_route,
+            "mahalanobis": maha_route,
+        }
+        results = {}
+        for name, route in routes.items():
+            adaptive_acc, adaptive_per_task = answer_breakdown(
+                route, adaptive_heads, optimal)
+            shared_acc, shared_per_task = answer_breakdown(
+                route, shared_heads,
+                {t: full_layer for t in TASKS})
+            results[name] = {
+                "task_acc": float((route == y_task).mean()),
+                "adaptive_answer_acc": adaptive_acc,
+                "adaptive_answer_by_true_task": adaptive_per_task,
+                "shared_l35_answer_acc": shared_acc,
+                "shared_l35_answer_by_true_task": shared_per_task,
+            }
+        return {
+            "optimal_taps": optimal,
+            "full_layer": full_layer,
+            "n_mixed_val": int(len(y_task)),
+            "avg_tap_layer": float(np.mean(list(optimal.values()))),
+            "avg_executed_blocks": float(np.mean(
+                [optimal[t] + 1 for t in TASKS])),
+            "full_depth_blocks": full_layer + 1,
+            "avg_depth_fraction": float(np.mean(
+                [optimal[t] + 1 for t in TASKS]) / (full_layer + 1)),
+            "routers": results,
+        }
+
     def routing_eval(banks, fit_heads=True):
         heads = {}
         for t in TASKS:
@@ -404,6 +589,13 @@ def _remote_body(layer: int, mode: str, size: str,
     elif mode == "embed":
         banks = banks_at_layer(-1)
         out["routers"] = routing_eval(banks)
+    elif mode == "adaptive":
+        out["adaptive"] = adaptive_eval()
+        for name, result in out["adaptive"]["routers"].items():
+            print(f"  [{name}] task={result['task_acc']:.3f} "
+                  f"adaptive={result['adaptive_answer_acc']:.3f} "
+                  f"shared_l35={result['shared_l35_answer_acc']:.3f}",
+                  flush=True)
     elif mode == "shuffle":
         res = {}
         for cond in ("identity", "word_shuffle", "token_shuffle"):
@@ -452,7 +644,7 @@ def run_multihead(mode: str, size="8B", layer=35, max_train=1000,
                   max_val=400, batch=16):
     """Single entrypoint (bench.py pattern): one function, mode selects.
 
-    mode: pilot | embed | shuffle | all
+    mode: pilot | embed | shuffle | adaptive | all
     "all" runs pilot -> embed -> shuffle sequentially in ONE container,
     so the model is loaded once and reused across modes.
     """
@@ -468,6 +660,9 @@ def run_multihead(mode: str, size="8B", layer=35, max_train=1000,
     if mode == "embed":
         return _remote_body(-1, "embed", size, max_train, max_val, batch,
                               None)
+    if mode == "adaptive":
+        return _remote_body(35, "adaptive", size, max_train, max_val, batch,
+                            None)
     if mode == "shuffle":
         return _remote_body(layer, "shuffle", size, max_train, max_val,
                             batch, None)
@@ -488,11 +683,19 @@ def _show(name, out):
         for c, r in out["results"].items():
             print(f"  {c:14s} linear={r['task_acc_linear']:.3f} "
                   f"maha={r['task_acc_mahalanobis']:.3f}")
+    if "adaptive" in out:
+        print(f"  avg depth={out['adaptive']['avg_depth_fraction']:.3f} "
+              f"of full ({out['adaptive']['avg_executed_blocks']:.1f}/"
+              f"{out['adaptive']['full_depth_blocks']:.0f} blocks)")
+        for c, r in out["adaptive"]["routers"].items():
+            print(f"  {c:18s} task={r['task_acc']:.3f} "
+                  f"adaptive={r['adaptive_answer_acc']:.3f} "
+                  f"shared_l35={r['shared_l35_answer_acc']:.3f}")
 
 
 def main():
     ap = argparse.ArgumentParser(description="Modal 8B multi-head pilot")
-    ap.add_argument("which", choices=["pilot", "embed", "shuffle", "all"])
+    ap.add_argument("which", choices=["pilot", "embed", "shuffle", "adaptive", "all"])
     ap.add_argument("--size", default="8B")
     ap.add_argument("--layer", type=int, default=35)
     ap.add_argument("--max-train", type=int, default=1000)

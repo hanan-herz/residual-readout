@@ -1,9 +1,10 @@
 # Multi-head single-pass routing — pilot results
 
-> Status: **branch pilot** (`exp/multihead-single-pass`), Qwen3-0.6B only.
+> Status: **branch pilot** (`exp/multihead-single-pass`), Qwen3-0.6B and Qwen3-8B.
 > Canonical paper numbers remain `paper/tables.tex`; nothing here feeds them.
-> All artifacts: `results/multihead_route_*.json`, `results/shuffle_control_*.json`.
-> Code: `multihead_route.py`, `embedding_control.py`, `shuffle_control.py`.
+> All artifacts: `results/multihead_*.json`, `results/shuffle_control_*.json`.
+> Code: `multihead_route.py`, `embedding_control.py`, `shuffle_control.py`,
+> `modal_multihead.py`.
 
 ## Question
 
@@ -172,14 +173,45 @@ route arbitrary/OOD text; if order-robust routing is required, route from
 a deeper tap (or use the supervised probe, which is order-robust at any
 layer).
 
+### 8. Adaptive serving path at 8B
+
+We evaluated the proposed production path directly on a matched mixed-traffic
+pilot: 1,000 training and 400 validation examples per task, 1,200 validation
+examples total. The L1 task-ID router selects the answer tap independently for
+each task, using the optima from the 8B single-head sweeps: BoolQ L30,
+RuleTaker L24, and ARC L35. The comparison is against running every task to
+L35. Heads were refit on the same matched pilot residuals for this evaluation.
+
+| router | task acc | adaptive taps answer acc | shared L35 answer acc |
+|---|---:|---:|---:|
+| gold task ceiling | 1.000 | 0.848 | 0.829 |
+| task-ID linear (L1) | 0.998 | **0.849** | 0.829 |
+| Mahalanobis (L1) | 1.000 | 0.848 | 0.829 |
+
+Per-task answer accuracy under gold routing:
+
+| task | adaptive tap | adaptive | shared L35 | gain |
+|---|---:|---:|---:|---:|
+| BoolQ | L30 | 0.870 | 0.848 | **+2.25pt** |
+| RuleTaker | L24 | 0.760 | 0.725 | **+3.50pt** |
+| ARC | L35 | 0.915 | 0.915 | +0.00pt |
+
+The adaptive path improves mixed-task answer accuracy by **1.9 points**
+(0.829→0.848) while stopping at an average of 30.7 of 36 transformer
+blocks (**85.2% of full depth**, a 14.8% depth/FLOP proxy reduction). The
+accuracy gain is broad: earlier task-specific taps improve BoolQ and
+RuleTaker, while ARC appropriately runs to the final layer. This is a
+measured depth proxy, not a wall-clock latency benchmark; actual savings
+also depend on batching, scheduling, and implementation overhead.
+
 ## Caveats
 
-- Single model (Qwen3-0.6B), small pilot sizes for sweep/controls
-  (400 train / 200 val per task); big-N exists only for L23/L27.
+- The routing pilot uses Qwen3-0.6B and Qwen3-8B; its matched controls use
+  400 train / 200 val per task, while the adaptive 8B path uses 1000 / 400.
 - Task-ID router is closed-set: no abstain. Open-world inputs silently
   route to the nearest task — see `gate_ar.py` for the coveredness gate.
-- Cross-scale: pilot-level findings replicated at 8B (section 7); depth
-  sweep and shuffle controls replicated at 8B pending.
+- Cross-scale: pilot-level findings, embedding control, depth optima, and
+  shuffle controls are now replicated at 8B (sections 7–8).
 - 8B per-task depth optima from full sweeps: BoolQ L30, RuleTaker L24,
   ARC L35 — the same "optima do not coincide" pattern as 0.6B.
 - BoolQ/RuleTaker L18 peaks vs L27 are ~1–4pt at full val — real-looking
@@ -193,4 +225,7 @@ layer).
   per-task depth optima split.
 - N-head generalization (TASKS list, confusion matrix sizing).
 - Big-N at more layers if the depth-plateau claim needs hardening.
-- Paper: not yet — needs replication at ≥1 more scale first.
+- Measure wall-clock serving latency and batching overhead for the adaptive
+  path; the current 14.8% figure is a depth/FLOP proxy only.
+- Paper: multi-head result is ready as a routing/serving appendix or note;
+  canonical single-head paper tables remain unchanged.
