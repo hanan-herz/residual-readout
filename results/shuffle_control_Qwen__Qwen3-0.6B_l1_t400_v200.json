@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "size": "0.6B",
+    "layer": 1,
+    "cond": [
+      "identity",
+      "word_shuffle",
+      "token_shuffle"
+    ],
+    "wash": "seed 123"
+  },
+  "results": {
+    "identity": {
+      "task_acc_linear": 1.0,
+      "task_acc_mahalanobis": 1.0,
+      "chance": 0.3333333333333333,
+      "n": 600
+    },
+    "word_shuffle": {
+      "task_acc_linear": 0.9083333333333333,
+      "task_acc_mahalanobis": 0.465,
+      "chance": 0.3333333333333333,
+      "n": 600
+    },
+    "token_shuffle": {
+      "task_acc_linear": 0.9116666666666666,
+      "task_acc_mahalanobis": 0.45,
+      "chance": 0.3333333333333333,
+      "n": 600
+    }
+  }
+}
