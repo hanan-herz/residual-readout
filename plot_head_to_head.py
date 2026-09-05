@@ -1,4 +1,8 @@
-"""Head-to-head: BoolQ (full-val) · RuleTaker (10k/4k) · ARC-Challenge (full).
+"""Historical plot; not a revised-paper figure or current reporting convention.
+
+Use scripts/build_descriptive_figures.py for the current manuscript.
+
+Head-to-head: BoolQ (full-val) · RuleTaker (10k/4k) · ARC-Challenge (full).
 
 Same six models, same three bars:
   readout (last.mlp, per-seed mean) · loop.zero · best loop
@@ -14,7 +18,6 @@ Protocols differ by design —
 
 Saves:
   head_to_head_three_tasks.png
-  head_to_head_boolq_ruletaker.png  (same figure; legacy name)
 """
 import json
 import os
@@ -147,13 +150,9 @@ def main():
         y=1.03,
     )
     fig.tight_layout()
-    outs = [
-        ROOT / "paper/figures/head_to_head_three_tasks.png",
-        ROOT / "paper/figures/head_to_head_boolq_ruletaker.png",  # legacy alias (now 3 panels)
-    ]
-    for out in outs:
-        fig.savefig(out, dpi=150, bbox_inches="tight")
-        print("saved", out.resolve())
+    out = ROOT / "paper/figures/head_to_head_three_tasks.png"
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    print("saved", out.resolve())
 
 
 if __name__ == "__main__":

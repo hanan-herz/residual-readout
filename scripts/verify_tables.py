@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Historical tooling: Scheme A/pilot mappings do not validate the revised tables.
+# Use scripts/build_descriptive_tables.py --check; see RESULTS.md.
 """Cross-check every number in Tables 1 & 2 against the on-disk artifacts.
 
 Adopted canonical convention (Scheme A, from the M1 review fix):

@@ -1,12 +1,12 @@
 cff-version: 1.2.0
 message: "If you use this work, please cite it."
-title: "The Vector Is the Answer? One-Pass Residual Readouts vs Fair Loop Scoring"
+title: "Supervised Residual Readouts versus Few-Shot Answer-Token Scoring"
 authors:
   - family-names: Herzog
     given-names: Hanan
     orcid: "https://orcid.org/0009-0009-0464-7112"
     email: hanan.herzog@gmail.com
 license: CC-BY-4.0
-repository-code: "https://github.com/hanan-herz/vector-is-the-answer"
-url: "https://github.com/hanan-herz/vector-is-the-answer"
+repository-code: "https://github.com/hanan-herz/residual-readout-bench"
+url: "https://github.com/hanan-herz/residual-readout-bench"
 type: software

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Historical tooling: incident-era estimator audit, not current source authority.
+# Revised-paper source mappings and checks: scripts/build_descriptive_tables.py.
+# See RESULTS.md; historical provenance is preserved in RESULTS_HISTORICAL.md.
 """Recover the canonical number per task x model cell from the artifacts.
 
 Resolves the M1 "Table 1 vs Tables 2/4 disagree" complaint by computing, for

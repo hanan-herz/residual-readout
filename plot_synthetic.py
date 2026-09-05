@@ -1,3 +1,5 @@
+# Historical tooling: separate synthetic exploration, not revised-paper evidence.
+# See RESULTS_SYNTHETIC.md and RESULTS.md for the distinction.
 """Synthetic multi-hop mechanism figure (RESULTS_SYNTHETIC.md).
 
 Two panels over Qwen3 scale (0.6B / 4B / 8B):

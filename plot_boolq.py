@@ -1,3 +1,5 @@
+# Historical tooling: best-loop selection, not the revised fixed-eight-shot view.
+# Use scripts/build_descriptive_figures.py; see RESULTS.md for current caveats.
 """BoolQ headline chart: one-pass readout vs the fair autoregressive loop.
 
 All six models, full-val (9427 train / 3270 val), read from the canonical

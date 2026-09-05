@@ -1,71 +1,66 @@
-# What generates what
+# Figures and Tables
 
-Paper figures and tables are **not** auto-built. Edit `results/*.json`,
-then re-run the script in the left column. Canonical numbers live in
-`paper/tables.tex`; figures are PNGs under `paper/figures/`.
+The current manuscript uses three descriptive vector PDFs and four tables.
+Both builders use the explicit `CELLS` and `BUDGET` mappings in
+`scripts/build_descriptive_tables.py`: 32 unique stored JSON sources under
+`results/`, not a directory-wide glob. No model inference, classifier
+fitting, or significance testing is performed by these builders.
 
-## Paper figures (`paper_body.tex`)
+## Current Outputs
 
-| Figure | Script | Reads |
+| Output | Content | Builder |
 |---|---|---|
-| `boolq_results.png` | `python plot_boolq.py` | `scripts/build_table1.py` `CELLS` (BoolQ rows) |
-| `boolq_budget_kcurve.png` | `python plot_boolq_budget.py` | `results/boolq_budget_{06b,4b,8b}.json` + `*_paired.json` |
-| `ruletaker_depth_strata.png` | `python plot_ruletaker_depth.py` | `results/ruletaker_{qwen06b,qwen4b,qwen8b,dsv4}_n10k.json` |
-| `tasklaw_summary.png` | `python plot_tasklaw.py` | `build_table1.CELLS` + rowpreds McNemar |
-| `head_to_head_three_tasks.png` | `python plot_head_to_head.py` | `build_table1.CELLS` (also writes legacy alias below) |
-| `head_to_head_boolq_ruletaker.png` | same | alias of the three-task figure |
-| `layersweep_placement.png` | `python plot_layersweep.py` | `results/{boolq,ruletaker,arc}_layersweep_{06b,4b,8b,mistral7b,granite8b,dsv4}.json` (+ `*_paired.json`) |
-| `synthetic_multihop.png` | `python plot_synthetic.py` | hardcoded arrays in the script |
+| `paper/figures/descriptive_main.pdf` | Final-layer readout means and seed SDs, with separate zero-shot and requested-eight-shot scorer arms | `scripts/build_descriptive_figures.py` |
+| `paper/figures/descriptive_budget.pdf` | BoolQ first-n and balanced refits, requested-shot scores, and full-training reference | `scripts/build_descriptive_figures.py` |
+| `paper/figures/descriptive_layers.pdf` | Recorded MLP layer sweeps and final-layer readouts from the same sweep sources | `scripts/build_descriptive_figures.py` |
+| `paper/tables.tex` | Main comparison, placement sweeps, controls, and BoolQ label budgets | `scripts/build_descriptive_tables.py` |
+| `paper/main_tables.tex` | Standalone wrapper for `tables.tex` | LuaLaTeX, run from `paper/` |
+| `paper/paper.pdf` | Public manuscript, including the current figures and tables | `bash paper/build.sh` |
 
-Not in the preprint (supporting / RESULTS.md):
+The source mapping uses full-evaluation loop reruns for BoolQ Mistral and
+Granite, separate RuleTaker 10k/4k placement sweeps, and the three BoolQ
+`samek` files for label-budget refits. Source comments in `paper/tables.tex`
+identify each row's inputs. Seed SD is not a confidence interval;
+evaluation-selected layer maxima are exploratory, not held-out gains.
 
-| Figure | Script | Notes |
-|---|---|---|
-| `arc_results.png` | `python plot_arc.py` | Qwen + DSV4 ARC JSONs only (no Mistral/Granite) |
-| `probe_results.png` (+ `_bars` / `_layers`) | `python plot_results.py` | hardcoded synthetic numbers; writes repo root **and** `paper/` (not `paper/figures/`) |
-| `confidence_calibration.png` | none | orphan PNG; no generator in-tree |
+## Check and Build
 
-## Paper tables
-
-| Table | File | Check / rebuild |
-|---|---|---|
-| Tables 1–4 | `paper/tables.tex` (hand-edited) | `python scripts/verify_tables.py` |
-| same, standalone | `paper/main_tables.tex` `\input{tables.tex}` | `lualatex paper/main_tables.tex` |
-| preprint | `paper/paper.tex` → `paper_body.tex` + `tables.tex` | `lualatex paper/paper.tex` |
-
-`scripts/verify_tables.py` `CELLS` is the **paper** map (BoolQ budget / RT layersweep).
-`scripts/build_table1.py` `CELLS` drives the **figures** (BoolQ budget / RT **10k/4k**).
-Those maps are not identical — do not assume a figure regen updates Table 1.
-
-Other helpers: `scripts/extract_canonical.py` (mean vs vote audit),
-`scripts/build_reconciled_table.py`.
-
-## Result JSON naming (shelf)
-
-`results/` is git-tracked. Layout: `{task}_{model}_{kind}.json`.
-
-| Kind | Example | What it is |
-|---|---|---|
-| `budget_*` | `boolq_budget_8b.json` | Ext 13 loop k-curve (pad 8192) |
-| `samek_*` | `boolq_samek_8b.json` | CPU readout-n curve (`budget` first-n, `budget.balanced`) |
-| `layersweep_*` | `boolq_layersweep_dsv4.json` | placement + last.mlp + loop |
-| `*_extract` | `boolq_dsv4_extract.json` | extract-token run; BoolQ `loop_val=1` is dummy |
-| `*_n10k` | `ruletaker_dsv4_n10k.json` | RuleTaker 10k/4k (headline) |
-| `*_n2k` | `ruletaker_dsv4_n2k.json` | RuleTaker 2k/1k (legacy; layersweep still this size) |
-| `*_paired` | `boolq_budget_8b_paired.json` | McNemar / bootstrap from rowpreds |
-| `*_rerun` | `boolq_granite8b_rerun.json` | full-val loop when layersweep loop was short |
-
-Same-k and DSV4 extract are **not** wired into plot scripts yet.
-DSV4 extract loop scores are not usable (`loop_val=1`).
-
-## One-shot regen (paper figures only)
+From the repository root, check the tables and list all source files using
+only Python 3's standard library:
 
 ```bash
-python plot_boolq.py
-python plot_boolq_budget.py
-python plot_ruletaker_depth.py
-python plot_tasklaw.py
-python plot_head_to_head.py
-python plot_layersweep.py
-python plot_synthetic.py
+python3 -B scripts/build_descriptive_tables.py --check --report
 ```
+
+Regenerate the tables or figures from the stored artifacts:
+
+```bash
+python3 -B scripts/build_descriptive_tables.py
+python3 -B scripts/build_descriptive_figures.py
+```
+
+The figure builder requires Matplotlib and checks that the tables are current
+before plotting. `bash paper/build.sh` performs that check, regenerates the
+figures, and compiles `paper/paper.pdf` with LuaLaTeX and BibTeX. See
+[`README.md`](README.md) for installation. These commands rebuild descriptive
+outputs, not the experiments that produced the stored results.
+
+## Historical Artifacts
+
+The older `plot_*.py` scripts and PNGs are historical, not inputs to the
+current manuscript. `scripts/build_table1.py`, `scripts/verify_tables.py`,
+`scripts/extract_canonical.py`, and `scripts/build_reconciled_table.py` use
+older reporting conventions; they do not validate the revised tables.
+Some historical plots use hardcoded synthetic arrays or different source
+mappings and paired-test statistics.
+
+The older 2k-protocol manuscript, two standalone synthetic renderings, and
+duplicate head-to-head alias were removed from the current tree; their
+previous versions remain in Git history. The `probe_results.png` composite
+and `paper/figures/head_to_head_three_tasks.png` remain historical artifacts.
+Their generators write only the retained outputs under `paper/figures/`.
+
+The old results narrative is preserved in root
+[`RESULTS_HISTORICAL.md`](RESULTS_HISTORICAL.md), with a current summary in
+[`RESULTS.md`](RESULTS.md). The canonical public paper remains
+`paper/paper.pdf`; `paper/paper-revised.pdf` is an ignored local copy.

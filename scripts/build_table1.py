@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Historical tooling: best-loop tables, not the revised-paper reporting convention.
+# Use scripts/build_descriptive_tables.py (--check to validate); see RESULTS.md.
 """build_table1.py — regenerate Table 1 (readout vs loop) from canonical runs.
 
 Reads the canonical (or *_rerun) run JSONs + their per-row preds npz, and

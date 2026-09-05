@@ -1,9 +1,7 @@
-"""Plot the latent-probe vs decoder-readout results across model sizes.
+"""Historical synthetic plot, not evidence for the revised paper.
 
-Saves two full-size figures (same figsize as boolq_results.png):
-  probe_results_bars.png  — single-pass readouts vs decoder
-  probe_results_layers.png — probe accuracy by residual-stream layer
-Also writes a side-by-side composite probe_results.png for README use.
+Writes only paper/figures/probe_results.png, the retained composite.
+Use scripts/build_descriptive_figures.py for the current manuscript.
 """
 import numpy as np
 import matplotlib
@@ -29,18 +27,14 @@ sizes = ["0.6B", "4B", "8B"]
 x = np.arange(len(sizes))
 w = 0.18
 
-# Match boolq_results.png panel size (plot_boolq.py: figsize=(9.5, 5.2)).
-FIGSIZE = (9.5, 5.2)
 DPI = 150
-OUT_DIRS = [Path("."), Path("paper")]
+OUT_DIR = Path(__file__).resolve().parent / "paper/figures"
 
 
 def _save(fig, name: str) -> None:
-    for d in OUT_DIRS:
-        d.mkdir(parents=True, exist_ok=True)
-        path = d / name
-        fig.savefig(path, dpi=DPI, bbox_inches="tight")
-        print("saved", path)
+    path = OUT_DIR / name
+    fig.savefig(path, dpi=DPI, bbox_inches="tight")
+    print("saved", path)
 
 
 def plot_bars(ax) -> None:
@@ -81,20 +75,7 @@ def plot_layers(ax) -> None:
     ax.legend(fontsize=9)
 
 
-# Full-size standalone figures (paper)
-fig, ax = plt.subplots(figsize=FIGSIZE)
-plot_bars(ax)
-fig.tight_layout()
-_save(fig, "probe_results_bars.png")
-plt.close(fig)
-
-fig, ax = plt.subplots(figsize=FIGSIZE)
-plot_layers(ax)
-fig.tight_layout()
-_save(fig, "probe_results_layers.png")
-plt.close(fig)
-
-# Side-by-side composite (README / RESULTS_SYNTHETIC)
+# Side-by-side composite (historical synthetic results).
 fig, axes = plt.subplots(1, 2, figsize=(13, 4.8))
 plot_bars(axes[0])
 plot_layers(axes[1])

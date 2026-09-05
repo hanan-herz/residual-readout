@@ -1,3 +1,5 @@
+# Historical tooling: best-loop/significance framing is not a revised-paper task law.
+# Use scripts/build_descriptive_figures.py; see RESULTS.md for current caveats.
 """Task-law summary figure — 3x6 heat panel (readout - best loop, 18 cells).
 
 Rows = task (BoolQ / RuleTaker 10k/4k / ARC-Challenge), cols = model

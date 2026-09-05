@@ -1,3 +1,5 @@
+# Historical tooling: vote/best-arm significance, not revised-paper budget evidence.
+# Use scripts/build_descriptive_figures.py; see RESULTS.md#samek-caveats.
 """Ext 13 k-curve: budget-matched loop vs one-pass readout (BoolQ, Qwen3 arc).
 
 Three panels (0.6B / 4B / 8B). Loop accuracy plotted as a curve over

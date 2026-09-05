@@ -1,3 +1,5 @@
+# Historical tooling: selected-layer significance is not a revised-paper claim.
+# Use scripts/build_descriptive_figures.py for descriptive sweeps; see RESULTS.md.
 """Readout probe-placement sweeps — full 3 x 6 matrix (Ext 14/15/16/17).
 
 Grid: rows = task (BoolQ / RuleTaker / ARC-Challenge), cols = model

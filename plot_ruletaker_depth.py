@@ -1,3 +1,5 @@
+# Historical tooling: configuration-derived strata are not question-level proof depth.
+# Not revised-paper evidence; see RESULTS.md and scripts/build_descriptive_figures.py.
 """RuleTaker 10k/4k depth plot: per-depth MLP + loop when ``stratum_depth_loop`` exists.
 
 Skips missing artifacts. Saves ruletaker_depth_strata.png.

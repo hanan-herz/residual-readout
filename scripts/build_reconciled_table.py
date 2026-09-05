@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Historical tooling: incident-era table reconciliation, not revised-paper tables.
+# Use scripts/build_descriptive_tables.py; Ext references below are historical
+# (RESULTS_HISTORICAL.md), not current RESULTS.md conclusions.
 """Build a reconciled Table 1 (readout vs loop) from the on-disk artifacts.
 
 Resolves M1 (paper review): the published Table 1 readout column and the

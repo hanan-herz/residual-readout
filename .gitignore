@@ -14,6 +14,8 @@ results.json
 *.log
 logs/
 weights/
+*.npy
+*.npz
 docgen/
 .DS_Store
 
@@ -22,6 +24,10 @@ docgen/
 .env.*
 *.pem
 credentials.json
+.modal.toml
+.flash/
+*.key
+id_ed25519
 
 # --- private / personal / sparring (not for public surface) ---
 *.txt
@@ -39,6 +45,11 @@ paper/how-we-differ-belinkov.md
 paper/AI-IGNORE
 
 # --- LaTeX build intermediates ---
+paper/.build-revision/
+paper/paper-revised.pdf
+paper/paper-review.pdf
+paper/paper_anonymous.pdf
+paper/main_tables.pdf
 paper/*.aux
 paper/*.out
 paper/*.log

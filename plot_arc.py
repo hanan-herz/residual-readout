@@ -1,3 +1,5 @@
+# Historical tooling: legacy ARC sources/framing, not revised-paper figures.
+# Use scripts/build_descriptive_figures.py; see RESULTS.md for current caveats.
 """ARC-Challenge full: one-pass multi-class readout vs fair A–D loop.
 
 Reads versioned shelf artifacts:

@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# HISTORICAL TOOLING: incident repair, NOT current revised-paper reproduction.
+# WARNING: launches remote benchmark jobs and can overwrite stored source files,
+# including results/boolq_{mistral7b,granite8b}_rerun.json used by the revised paper.
+# The historical SAFETY note below does not protect existing *_rerun.json files.
+# For current table reproduction use scripts/build_descriptive_tables.py;
+# see RESULTS.md and RESULTS_HISTORICAL.md. Do not run this as a paper rebuild.
 # rerun_canonical.sh — launch the minimal set of canonical re-runs that make
 # every Table 1 cell unassailable.
 #

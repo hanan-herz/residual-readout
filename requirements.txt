@@ -1,5 +1,7 @@
-# Core deps for local verify / table rebuild (CPU-friendly).
-# Full re-runs also need a GPU or Modal; cloud image pins live in bench.py.
+# Experiment dependencies; suitable compute, weights, and datasets are separate.
+# Descriptive table checks use only the Python standard library.
+# Paper builds need Matplotlib plus external LuaLaTeX/BibTeX, not this full list.
+# Cloud image dependencies are defined separately in bench.py.
 torch
 transformers>=4.46
 datasets
@@ -11,4 +13,5 @@ accelerate
 sentencepiece
 protobuf
 requests
-# modal  # optional, for cloud re-runs
+# bench.py imports Modal unconditionally, even for --local --help.
+modal

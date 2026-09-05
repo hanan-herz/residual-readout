@@ -1,104 +1,113 @@
-# The Vector Is the Answer?
+# residual-readout-bench
 
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](LICENSE)
 
-**One-pass residual readouts vs fair loop scoring**
+**Supervised Residual Readouts versus Few-Shot Answer-Token Scoring**
 
-On closed-set classification tasks (yes/no and multiple-choice), a single
-prompt forward pass is enough: a small supervised head on a **frozen**
-open-weight model’s final-token residual matches the strongest closed-set use
-of the autoregressive loop as a *classifier* (full context, balanced few-shot,
-next-token log-prob over the same answer set). We do **not** claim this for
-free-form or multi-step generation. Boundaries of the claim are measured, not
-erased.
+A descriptive comparison of supervised classifiers on frozen final-token
+residual states with zero-/few-shot answer-token scoring across six models
+on BoolQ, RuleTaker, and ARC-Challenge. The methods use different amounts of
+task supervision and different prompt lengths. The stored scorer sums
+log-probabilities of alternative answer tokens, rather than marginalizing
+their probability mass; corrected-baseline performance is unmeasured.
 
-| | |
-|--|--|
-| **Paper** | [`paper/paper.pdf`](paper/paper.pdf) · sources in [`paper/`](paper/) |
-| **Author** | Hanan Herzog · [ORCID](https://orcid.org/0009-0009-0464-7112) · hanan.herzog@gmail.com |
-| **Tasks** | BoolQ (full val), RuleTaker 10k/4k, ARC-Challenge (full test) |
-| **Models** | Qwen3-0.6B/4B/8B, Mistral-7B, Granite-3.1-8B, DeepSeek-V4-Flash |
-| **Cite** | [`CITATION.cff`](CITATION.cff) |
+Against the fixed requested-eight-shot arm, final-layer readout means are
+higher in 5/6 RuleTaker cases, 2/6 BoolQ cases, and 0/6 ARC cases. In the
+existing BoolQ 8/16/32/64-label refits, both refit protocols are below the
+corresponding requested-shot scorer in all 12 model/budget settings. These
+are descriptive comparisons, not significance, equivalence, or
+supervision-matched superiority findings.
 
-Concurrent related work (different baseline/object):
-[Hazenoot et al., arXiv:2608.07208](https://arxiv.org/abs/2608.07208)
-(hidden-state probes vs weak/zero-shot decoding). The “answer is in the
-latent” phenomenon is not novel; this repo measures a **producer readout on
-the prompt residual alone** against a **fair closed-set scoring loop** under
-matched budget and paired tests.
+| Resource | Location |
+|---|---|
+| Public paper | [`paper/paper.pdf`](paper/paper.pdf), with LaTeX sources in [`paper/`](paper/) |
+| Repository | https://github.com/hanan-herz/residual-readout-bench |
+| Author | Hanan Herzog, [ORCID](https://orcid.org/0009-0009-0464-7112), hanan.herzog@gmail.com |
+| Citation | [`CITATION.cff`](CITATION.cff) |
+| Figures and tables | [`FIGURES.md`](FIGURES.md) |
 
-## Install and verify (no GPU)
+## Quickstart (no GPU)
 
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python scripts/verify_tables.py   # checks results/ vs paper tables
-```
-
-Canonical headline numbers live in [`paper/tables.tex`](paper/tables.tex)
-(Scheme A: best-of loop arms). Rebuild summaries from JSON under
-[`results/`](results/):
+Run from the repository root. Checking the current tables requires only
+Python 3's standard library, with no package installation or network access:
 
 ```bash
-python scripts/build_table1.py
-python scripts/verify_tables.py
+python3 -B scripts/build_descriptive_tables.py --check
 ```
 
-Full experiment re-runs need a GPU or [Modal](https://modal.com); datasets load
-via HuggingFace. Cloud image pins also live in Modal builders inside
-`bench.py`.
+Add `--report` to list the 32 explicitly mapped JSON sources and unrounded
+descriptive values. This checks `paper/tables.tex` against stored artifacts;
+it does not rerun experiments or validate their original execution.
 
 ### Paper build
 
-```bash
-./paper/build.sh
-```
-
-`paper/paper.pdf` is the built preprint; table numbers should match
-`scripts/verify_tables.py` / `paper/tables.tex`.
-
-### Full re-runs
+Install Matplotlib in a virtual environment and a TeX distribution providing
+LuaLaTeX, BibTeX, and the packages used by the manuscript:
 
 ```bash
-python scripts/extract_canonical.py
-# full re-runs (Modal / GPUs): bash scripts/rerun_canonical.sh
-# example shape — see bench.py --help for full flags
-python bench.py --task boolq --model Qwen/Qwen3-0.6B ...
-python paired_test.py ...
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install matplotlib
+bash paper/build.sh
 ```
 
-Reported figures: see [`FIGURES.md`](FIGURES.md) (`python plot_boolq.py`, …).
+The build checks the tables, regenerates the three descriptive PDF figures,
+and compiles the public `paper/paper.pdf`. It does not load models or fit
+classifiers. `paper/paper-revised.pdf` is an ignored local revision copy,
+not a second public paper.
 
-## Layout
+### Experiments (separate setup)
+
+The experiment harness needs additional dependencies, model weights,
+datasets, and suitable compute. In an activated experiment environment:
+
+```bash
+python3 -m pip install -r requirements.txt
+python3 -B bench.py --local --help
+```
+
+`bench.py` currently imports Modal unconditionally, including for local
+runs and help, so `modal` is included in the requirements. Put `--local`
+first; local model selection uses `--size` (for example, `0.6B`), and tasks
+use `--task boolq`, `--task ruletaker`, or `--task arc`. Help does not run an
+experiment. Cloud runs additionally require Modal setup; image dependencies
+are defined in `bench.py`.
+
+The historical Modal application identifier `vector-is-the-answer-bench`
+is unchanged; it is not the GitHub repository name. Package versions are
+not a lockfile for the original runs.
+
+These instructions do not guarantee exact reproduction of stored runs.
+In particular, the BoolQ cache-refit generator and exact balanced subset
+identities have not been recovered. See the paper for protocol limitations.
+
+## Layout and History
 
 | Path | Role |
-|------|------|
-| `paper/` | Preprint (PDF + LaTeX), figures, bib |
-| `bench.py`, `common.py`, `paired_test.py` | Core experiment harness |
-| `tasks/` | BoolQ / RuleTaker / ARC loaders |
-| `scripts/` | Table build, verify, canonical re-runs |
-| `results/` | Run JSON (headline numbers source of truth) |
-| `RESULTS.md` | Narrative results index (see banner for canonical numbers) |
-| `FIGURES.md` | Script → figure / table map |
-| `cloud/` | Optional Modal serving helpers (no secrets) |
+|---|---|
+| `paper/` | Current manuscript, generated tables, and figures |
+| `scripts/build_descriptive_*.py` | Current table and figure builders |
+| `bench.py`, `common.py`, `paired_test.py` | Experiment harness and historical paired-test tooling |
+| `tasks/` | BoolQ, RuleTaker, and ARC loaders |
+| `results/` | Stored experiment JSON artifacts |
+| `cloud/` | Modal serving helpers |
 
-## License
+[`RESULTS.md`](RESULTS.md) summarizes the current results; root
+[`RESULTS_HISTORICAL.md`](RESULTS_HISTORICAL.md) preserves the old narrative.
+Older plotting and table tools are historical, not validators for the
+revised manuscript; see `FIGURES.md` for their status.
+
+## License and Citation
 
 Code, data, and manuscript: CC BY 4.0 (attribution required).
 See [`LICENSE`](LICENSE).
 
-Cite the PDF once arXiv-assigned; until then cite this repository:
-
 ```bibtex
-@misc{herzog2026vector,
-  title={The Vector Is the Answer? One-Pass Residual Readouts vs Fair Loop Scoring},
+@misc{herzog2026residualreadout,
+  title={Supervised Residual Readouts versus Few-Shot Answer-Token Scoring},
   author={Herzog, Hanan},
   year={2026},
   howpublished={GitHub},
-  url={https://github.com/hanan-herz/vector-is-the-answer}
+  url={https://github.com/hanan-herz/residual-readout-bench}
 }
-```
-
-```
-Herzog, H. The Vector Is the Answer? One-Pass Residual Readouts vs Fair Loop Scoring.
 ```
