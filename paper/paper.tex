@@ -1,5 +1,5 @@
-% The Vector Is the Answer? — main paper (arXiv preprint). Authoritative
-% single-column source. Numbers: RESULTS.md (Ext 8–17).
+% Supervised Residual Readouts versus Few-Shot Answer-Token Scoring.
+% Authoritative single-column source; tables generated from stored JSONs.
 % Body: paper_body.tex. Tables: tables.tex.
 % Build: ./build.sh
 \documentclass[11pt]{article}
@@ -12,31 +12,13 @@
 \usepackage[numbers,sort&compress]{natbib}
 \setlength{\bibsep}{2pt plus 1pt}
 \usepackage{caption}
-\usepackage{newtxtext}
+\usepackage{lmodern}
 \usepackage[dvipsnames]{xcolor}
 \usepackage{hyperref}
-\usepackage{eso-pic}
 % Captions at small so long table notes stay readable.
 \captionsetup{font=small,labelfont=bf}
 \captionsetup[table]{font=small,labelfont=bf}
 \hypersetup{colorlinks=true,linkcolor=black,citecolor=NavyBlue,urlcolor=NavyBlue}
-\newcommand{\drafttimestamp}{%
-  \number\day/\number\month/\number\year\space
-  \directlua{tex.sprint(os.date("!"..string.char(37).."H:"..string.char(37).."M"))}%
-}
-
-% ArXiv-style draft marker in the outer margin; this is an overlay and does not
-% affect the paper's layout or pagination.
-\AddToShipoutPictureFG{%
-  \AtPageLowerLeft{%
-    \put(22,0){\color{gray!35}\rule{1pt}{\paperheight}}%
-    \put(25,365){%
-      \rotatebox{90}{%
-        \sffamily\bfseries\fontsize{8}{8}\selectfont\color{gray!65}%
-        DRAFT\ --\ \drafttimestamp}%
-    }%
-  }%
-}
 
 \newcommand{\sd}[1]{\textbf{#1}}
 \newcommand{\pstar}{$^{*}$}

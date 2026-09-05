@@ -1,5 +1,5 @@
-\title{\textbf{The Vector Is the Answer?\\
-One-Pass Residual Readouts vs Fair Loop Scoring}}
+\title{\textbf{Supervised Residual Readouts versus\\
+Few-Shot Answer-Token Scoring}}
 \ifdefined\AnonymousVersion
 \author{Anonymous Author(s)}
 \date{}
@@ -15,590 +15,454 @@ One-Pass Residual Readouts vs Fair Loop Scoring}}
 \maketitle
 
 \begin{abstract}
-Language models usually answer classification questions by generating an answer
-token, but their internal representation may already contain the information
-needed to choose the correct answer. We test this by comparing two ways of
-answering questions with a fixed choice set. The first is a small classifier
-on the frozen residual after one forward pass. The second is fair closed-set
-scoring: the model sees the question and balanced few-shot examples, and we
-compare answer-token probabilities rather than free-form or multi-step
-generation. The classifier is trained on the gold training split; the loop
-is few-shot scoring, not a fine-tuned decoder.
+Frozen language-model representations can serve as features for supervised
+classification. We report a descriptive comparison between a small classifier
+trained on final-token residual states and a zero-/few-shot answer-token
+scoring heuristic, across six open-weight models on BoolQ, RuleTaker, and
+ARC-Challenge. The backbone is unchanged in both methods, but their
+task-specific supervision and prompt lengths differ. Relative to the fixed
+eight-shot arm, the final-layer classifier has higher mean accuracy in five
+of six RuleTaker cases, two of six BoolQ cases, and none of the six ARC cases.
+These are numerical comparisons, not equivalence or significance findings.
+Existing BoolQ label-budget refits qualify the full-training results: at
+each recorded budget of 8, 16, 32, and 64 labels, both refit protocols have
+lower mean accuracy than the corresponding requested-shot scorer across
+the three tested Qwen models.
 
-We evaluate on BoolQ, RuleTaker, and ARC-Challenge with six open-weight models
-from 0.6B to a mixture-of-experts model. The one-pass classifier matches or
-beats token scoring on BoolQ and RuleTaker except two cells (Mistral-7B on
-BoolQ; DeepSeek-V4-Flash on RuleTaker). On ARC-Challenge the scorer wins when
-the one-pass classifier is still weak --- that tracks probe accuracy, not
-model size --- including an 8.2-point gap on Granite-3.1-8B. The
-classifier's largest gain is 11.9 points on RuleTaker with Granite-3.1-8B,
-where token probabilities are weakest. Label-shuffle, random-projection, and
-paired tests support the comparison. Sweeping the tap across depth, the best
-mid-layer readout beats the final layer in 10 of 18 cells after correction and
-never loses significantly. That is what a small readout can extract, not a
-license to skip later layers. For this task class the vector often already
-contains the answer; the loop still wins on ARC when the probe is weak.
+The stored scorer sums log-probabilities of alternative answer tokens; it
+does not marginalize their probability mass. Our comparisons therefore
+apply to that implemented heuristic, not to a corrected likelihood baseline.
+Exploratory layer sweeps and control readouts describe predictive information
+accessible to the tested classifiers, without identifying a reasoning
+mechanism or establishing an advantage independent of supervision. Together,
+the results document model-, task-, and budget-dependent performance under
+the evaluated protocols.
 \end{abstract}
 
 \section{Introduction}
 
-Autoregressive decoding is the usual interface to a language model, but it is
-only one readout of a residual vector that already exists after a single
-forward pass. On closed-set classification, does that vector already contain
-the gold label?
+A frozen language model offers more than one interface for classification.
+One can use its answer-token outputs, or train a separate classifier on its
+internal representations. These interfaces need not give the same accuracy:
+the output head was trained for next-token prediction, while a supervised
+readout is fitted to the target task's labels. A useful empirical question is
+how the two procedures compare under explicitly stated training and inference
+budgets, rather than whether an answer is literally present in a vector.
 
-We compare two readouts of the same frozen model. The \emph{one-pass
-\head{}} is a small classifier --- logistic regression or a one-hidden-layer
-MLP --- fit to the final-token residual after one prompt pass; the backbone
-is never updated. Linear probes sit within a few points of the MLP
-(\S\ref{sec:boolq}). The \emph{fair loop} is closed-set scoring: the model
-sees the question plus balanced few-shot exemplars, and we compare next-token
-log-probabilities over the answer set. Zero-shot prompting understates this
-baseline \citep{cho2025hidden}. A probe that recovers the model's self-report
-shows beliefs are present, not that a \head{} matches a fair loop at the gold
-label.
+We compare a one-hidden-layer MLP on final-token residual states with
+zero-/few-shot answer-token scoring. Both use a frozen backbone and one prompt
+forward pass per example, but they do not use identical prompts or equal
+amounts of task-specific supervision. In the main experiments, the classifier
+is fitted on thousands of labeled examples; the scorer receives a small
+number of labeled demonstrations in its prompt. The scorer is allowed a
+longer context, which can preserve more passage text and demonstrations but
+does not compensate in a controlled way for the classifier's training labels.
 
-The loop is given balanced few-shot exemplars and a longer context than the
-\head{} (deliberately; \S\ref{sec:setup}). The \head{} is fit on the training
-split. Extra in-context shots do not erase the pattern on BoolQ
-(\S\ref{sec:boolq}). We report label-shuffle nulls, random-projection
-selectivity, and paired tests.
-
-\textbf{Concurrent work.} \citet{hazenoot2026esg} find a linear probe on frozen
-activations beats the same model's prompted yes/no on ESG concept measurement
-(11/12 comparisons), mid-network. Their baseline is zero-shot prompting, which
-understates the loop (\S\ref{sec:boolq}), and they report no paired
-significance or selectivity controls.
-
-\textbf{Findings.} BoolQ (full validation, 3270 rows), RuleTaker (10k/4k),
-ARC-Challenge (full test); six models from 0.6B to a frontier MoE:
-
+Our contribution is a descriptive comparison over six models and three
+datasets, with existing budget refits and exploratory representation analyses.
+It is not a new probing method, a supervision-matched superiority result,
+or a test of iterative reasoning. The main observations are:
 \begin{enumerate}
-\item \textbf{BoolQ and RuleTaker: match or win, with two exceptions.} The
-  one-pass \head{} matches or beats the fair scorer except Mistral-7B on BoolQ
-  ($-2.2$pt) and DeepSeek-V4 on RuleTaker ($-1.6$pt). Four of six BoolQ cells
-  are statistical ties within $\pm$1.2pt (\S\ref{sec:boolq}, \S\ref{sec:tasks}).
-\item \textbf{On ARC the loop wins when the probe is weak.} The
-  gap tracks probe accuracy, not parameter count: Qwen $-10.6 \to -4.1 \to
-  -0.4$pt (the last ns); Granite-8B still loses by $8.2$pt at readout
-  accuracy 0.708 (\S\ref{sec:boundary}).
-\item \textbf{Answer-relevant information is already present mid-depth.} The
-  best mid-layer tap beats the final layer at 11/18 cells (10/18 after
-  Benjamini--Hochberg) and never loses. That is what a small readout can
-  extract from $h_l$, not a claim that later layers can be skipped
-  (\S\ref{sec:placement}).
-\item \textbf{The margins can be large.} Where token probabilities are
-  weakest, the \head{}'s lead is largest: $+11.9$pt on RuleTaker with
-  Granite-3.1-8B (\head{} 0.823 vs loop 0.703, McNemar $p=1.1\mathrm{e}{-45}$).
+\item \textbf{Relative accuracy varies by task and model.} The final-layer
+classifier is numerically higher than the fixed eight-shot scorer in five
+RuleTaker cases and two BoolQ cases, while the scorer is higher in all six
+ARC cases. The magnitudes vary substantially (Table~\ref{tab:main}).
+\item \textbf{Supervision changes the comparison.} In the existing BoolQ
+refits, matching the number of classifier training labels to the requested
+number of demonstrations does not preserve the full-training classifier's
+advantage (Table~\ref{tab:budget}). These artifacts match declared counts,
+not independently verified example identities or retained prompt counts.
+\item \textbf{Intermediate states support predictive readouts.} Some
+evaluation-selected intermediate layers have higher readout accuracy than
+the final layer. These exploratory maxima do not establish held-out gains
+from layer selection or justify stopping the backbone early
+(Table~\ref{tab:placement}).
 \end{enumerate}
 
-Fine-tuned specialist encoders beat our \head{}; serial-depth tasks may
-require the loop; a frozen latent loop drifts
-(\S\ref{sec:boundary}, \S\ref{sec:discussion}). The result is for this task
-class, not early exit and not all tasks.
-
-\textbf{Scope.} A companion position paper explores a serving architecture of
-kilobyte-scale \head{} heads (Paper~2). This paper contains no architecture
-claims and no production system.
+The interpretation is further limited by the implemented scoring heuristic:
+its aggregation of alternative tokens differs from probability
+marginalization. We describe the exact rule below and retain its measured
+accuracies without presenting it as the strongest available output baseline.
 
 \section{Setup and Method}
 \label{sec:setup}
 
-\subsection{Two readouts of the same vector}
+\subsection{Supervised residual readout}
 
-\textbf{One-pass \head{}.} Let $h_T \in \mathbb{R}^d$ be the final-token
-residual of a frozen model after one forward pass over the task prompt
-(question $+$ passage, truncated at $\mathrm{pad\_max}=384$). We fit a head
-$f(h_T) \to \hat{y}$: either multinomial logistic regression or a
-one-hidden-layer MLP (width 128, 4-seed vote), both on standardized features.
-The head sees only task labels; the backbone is never updated.
+Let $h_T\in\mathbb{R}^d$ denote the last nonpadding token's output from
+the final transformer block of a frozen model, before subsequent model-level
+normalization or output processing. For DeepSeek, grouped trailing output
+dimensions are flattened into a feature vector. The prompt includes the
+question and, where supplied by the task, the passage. Gold answers are not
+appended to the readout's input. Prompts are left-truncated to 384 tokens,
+retaining the prompt suffix and trailing answer slot, but not necessarily
+the complete question. We standardize features using training-set means and standard
+deviations and fit a width-128, one-hidden-layer ReLU MLP. The implementation
+uses full-batch Adam with learning rate $10^{-3}$ for 150 epochs, with binary
+or multiclass cross-entropy as appropriate. The backbone is never updated;
+the MLP is nevertheless a task-supervised model.
 
-\textbf{Fair loop.} The autoregressive baseline is \emph{not} greedy decode
---- it is the strongest \emph{classifier} the loop provides. The model receives the
-full context (balanced few-shot exemplars, $\mathrm{loop\_pad\_max}$
-2048--8192) and is scored by next-token log-probability over the closed answer
-set (Yes/No, or A--D). We report loop.0 (zero-shot) and loop.$k$ ($k$-shot);
-where noted we sweep $k$ up to 64 with a $4\times$ pad budget.
-\emph{Scope:} we evaluate the strongest \emph{classifier} the loop offers, not
-a chain-of-thought loop that generates intermediate tokens before answering.
-Generated-then-answered chains are a different readout, break the matched
-closed-set scoring protocol, and --- on a serial task such as RuleTaker ---
-require intermediate generation by construction; they are out of scope for the
-matched comparison.
+The main readout statistic is the mean accuracy over four training seeds,
+with their standard deviation. It is neither the accuracy of the best seed
+nor that of a seed-vote ensemble. Logistic-regression readouts and other
+feature transformations are secondary analyses; selection of regularization
+or projection dimension on evaluation accuracy is exploratory.
 
-\subsection{Matching requirements}
+\subsection{Implemented answer-token scorer}
+\label{sec:scorer}
 
-A \head{}-vs-loop comparison is only meaningful if the loop is not
-handicapped. We match \textbf{scoring} (same closed answer set, accuracy on
-identical rows). On \textbf{information} we advantage the loop: both see the
-same question and passage, and the loop also sees $k$ balanced exemplars from
-the training split plus a longer pad ($2048$--$8192$ vs.\ the \head{}'s
-$384$). That is conservative for the \head{}: the loop sees more of the
-passage and the exemplars. The \head{} is a probe fit on the training labels;
-the loop is in-context scoring. We sweep the loop to $k{\le}64$ at
-$4\times$ pad on BoolQ at 0.6B/4B/8B; extra shots plateau and do not pass the
-\head{} where it was winning (\S\ref{sec:boolq}).
+The baseline processes a task prompt with zero or $k$ balanced demonstrations
+from the training split. Demonstrations are selected in class round-robin
+order from the shuffled training rows; selection is not averaged over
+different exemplar sets or orders. Both methods choose from the same closed
+answer set: Yes/No for BoolQ and RuleTaker, and A--D for ARC. The baseline
+does not generate intermediate reasoning or a free-form answer.
 
-\subsection{Controls}
+For each answer class $c$, the implementation constructs a token-ID set
+$S_c$ from bare and space-prefixed answer variants tokenized after
+\texttt{Answer:}. It slices off the number of tokens in the standalone
+prefix, unions the remaining IDs, and removes IDs shared by classes.
+At the last prompt token, it computes
+\begin{equation}
+s_c(x)=\sum_{t\in S_c}\log p_\theta(t\mid x),\qquad
+\hat{y}=\mathop{\mathrm{argmax}}_c s_c(x).
+\end{equation}
+Thus it ranks the \emph{product} of the individual token probabilities, not
+the sum of probability mass for mutually exclusive answer variants.
+Marginalization over single-token alternatives would instead use
+$\log\sum_{t\in S_c}p_\theta(t\mid x)$. Collecting IDs from a multi-token
+variant also does not compute that variant's sequence likelihood.
 
-Every headline number carries four controls:
+A local tokenizer audit found two IDs per Yes/No class for each of the six
+model tokenizers. On ARC, Mistral and Granite have two IDs per class; the
+Qwen and DeepSeek tokenizers yield one retained ID per class. In the latter
+cases, bare letter variants change the prefix tokenization and contribute
+no suffix IDs under the implemented slicing rule. Consequently, even where
+sum and marginalization coincide for the retained singleton, the procedure
+does not establish coverage of all intended answer variants.
 
-\begin{itemize}
-\item \textbf{Label-shuffle null}: the head refit on
-  permuted labels must sit at chance, ruling out leakage and spurious
-  separability.
-\item \textbf{Random-projection selectivity}: a head on
-  random Gaussian projections of the residual. If it retains accuracy, the
-  signal is \emph{diffuse} --- no privileged subspace --- which is what we
-  find (permuted-basis $\approx$ max-basis $\gg$ noise floor) at every scale.
-\item \textbf{Final-token vs full-context}: a mean-pooled
-  full-context \head{} must underperform the final-token \head{}, confirming
-  the verdict is \emph{computed into} the final state rather than read off the
-  passage surface.
-\item \textbf{Paired significance}: McNemar's exact test and paired bootstrap
-  on per-row predictions from identical val rows,
-  not pooled-accuracy eyeballing.
-\end{itemize}
+All reported loop accuracies use this existing heuristic. Its numerical
+difference from a corrected scorer is unmeasured. The pipeline saves
+aggregate accuracies and, on fresh runs, class predictions rather than the
+token probabilities needed to rescore offline. These results should not be
+read as comparisons against standard answer-likelihood scoring generally.
 
-On BoolQ at DeepSeek-V4 we also re-score within question- and passage-length
-terciles (accuracy 0.89--0.90, flat). That is a coarse check that the
-\head{}'s edge is not an artifact of the loop truncating long rows; it is
-not a control on every cell.
+\subsection{Supervision, context, and reporting}
 
-\subsection{Models and artifacts}
+The main readouts use 9427 training labels on BoolQ, 10000 on RuleTaker,
+and 1000 on ARC. We report zero- and eight-shot scorer arms separately,
+without selecting the stronger arm for the main comparison. This is a
+reporting choice for the present descriptive analysis, not a preregistered
+experimental design. Additional BoolQ runs requested up to 64 demonstrations.
 
-Six open-weight models spanning three families and a width ladder: Qwen3-0.6B
-($28{\times}1024$), Qwen3-4B ($36{\times}2560$), Qwen3-8B ($36{\times}4096$),
-Mistral-7B ($32{\times}4096$), Granite-3.1-8B ($40{\times}4096$),
-DeepSeek-V4-Flash ($43{\times}4096$, FP8 MoE). All runs are batch 8 on
-model-pinned GPUs (0.6B/4B H200, 8B/Mistral/Granite B200, DSV4 B300). Trained
-heads are persisted per layer as versioned artifacts ($\sim$0.5--8.4\,MB each);
-per-row predictions persist for paired tests. Run manifests embed the batch
-tag in cache keys.
+The scorer's token cap is 8192 for the Qwen BoolQ budget runs and 2048
+otherwise, compared with the readout's 384. Left truncation can remove
+passage content, complete demonstrations, or parts of demonstrations. The
+stored results do not measure per-row truncation or the number of retained
+complete demonstrations. We therefore use \emph{requested shots}, not
+effective shots. Equal question identities and answer sets do not imply
+equal token-level inputs or supervision.
 
-\section{BoolQ: one-pass \head{} vs the fair loop}
+Table~\ref{tab:main} reports seed means and SDs for the classifier and single
+accuracies for the scorer. SD describes training-seed variation on the fixed
+evaluation set, not a confidence interval for population performance.
+Historical paired tests used separately fitted four-seed vote predictions;
+they do not directly test the displayed seed-mean differences. We do not
+attach those tests to the present descriptive tables. Small numerical
+differences are not evidence of equivalence, and no count of significant
+wins or corrected discoveries is claimed.
+
+\subsection{Models and datasets}
+
+The models are Qwen3-0.6B, Qwen3-4B, Qwen3-8B, Mistral-7B-v0.3,
+Granite-3.1-8B-base, and DeepSeek-V4-Flash (the stored model slug is
+\texttt{DeepSeek-V4-Flash-0731}). These are six models from four families,
+including dense and mixture-of-experts architectures, not a controlled
+architecture or parameter-count ablation.
+Reported backbone runs use batch size 8; DeepSeek uses the local quantized
+checkpoint loading path. Training-seed SD does not include variation from
+backbone numerical execution.
+
+BoolQ \citep{clark2019boolq} uses the \texttt{google/boolq} training split
+and its 3270-row validation split. RuleTaker \citep{clark2020ruletaker}
+uses \texttt{tasksource/ruletaker}, with 10000 sampled training rows and
+4000 sampled rows from the official \emph{test} split. The artifacts call
+the latter \texttt{val}; this is an evaluation-set name, not the official
+validation split. ARC-Challenge \citep{clark2018arc} uses
+\texttt{allenai/ai2\_arc}, retaining four-choice items, with 1000 training
+and 1165 test examples. No retrieval corpus is supplied for ARC, but the
+question and choices themselves remain part of the input.
+
+\section{Results}
+
+Figure~\ref{fig:descriptive-main} visualizes the fixed final-layer and
+separate scorer arms reported in Table~\ref{tab:main}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/descriptive_main.pdf}
+\caption{\textbf{Cross-model accuracy under different supervision protocols.}
+Readout points are final-layer four-seed means; bars show seed SD, not
+confidence intervals. Scorer points retain both zero-shot and requested
+eight-shot arms of the implemented token-probability heuristic.
+Readouts use 9427 BoolQ, 10000 RuleTaker, or 1000 ARC training labels;
+scorers do not fit task-specific weights. Prompt lengths and token caps
+differ (Table~\ref{tab:main}). No significance tests are shown.}
+\label{fig:descriptive-main}
+\end{figure}
+
+\subsection{BoolQ: full-training and small-budget readouts}
 \label{sec:boolq}
 
-BoolQ \citep{clark2019boolq} is binary reading comprehension with the gold
-answer grounded in a passage --- the cleanest closed-set case in which to test
-whether one prompt forward pass already carries the label. We load the standard Hugging Face release (\texttt{google/boolq}) and
-use the full validation split (9427 train / 3270 val).
+Table~\ref{tab:main} shows substantial variation in the final-layer
+classifier's relation to the fixed eight-shot scorer. Qwen3-0.6B has a
+classifier mean of 0.746 versus 0.645 for eight-shot scoring; Qwen3-8B is
+only slightly higher, at 0.878 versus 0.876. In the other four models the
+eight-shot scorer is numerically higher. We do not interpret the smaller
+differences as statistical ties.
 
-\subsection{Headline}
+The existing requested-shot sweep is important context for the 0.6B result:
+its scorer rises from 0.631 at zero shots to 0.715 at both 32 and 64 shots
+(rounded), reducing the full-training readout's lead to about 3.0 percentage
+points. Similar 32- and 64-shot accuracies in this one protocol do not
+establish saturation with additional supervision: context truncation and
+the single exemplar ordering are not separately controlled.
 
-Across the Qwen and Granite scales, the one-pass \head{} \textbf{wins at
-0.6B, is a statistical tie at 4B/8B (numerical losses ${\sim}$0.8--1.2pt,
-ns), and trails the few-shot loop by $\sim$1pt (ns) at Granite-8B and the
-frontier MoE} (Table~\ref{tab:main}). The one exception is Mistral-7B, where
-the loop wins by $2.2$pt ($p=2.6\mathrm{e}{-03}$) --- the single significant
-loop win on BoolQ, which we flag as a single-model exception
-(\S\ref{sec:discussion}).
+Table~\ref{tab:budget} reports existing cache-refit artifacts for 8, 16,
+32, and 64 training labels on the three Qwen models. They contain both
+first-$n$ and class-balanced refits. In all 12 model--budget settings,
+both refit means are below the corresponding requested-shot scorer.
+For example, the 0.6B class-balanced 64-label readout scores 0.640,
+compared with 0.715 for requested-64-shot scoring and 0.746 for the
+full-training readout. At 64 labels the corresponding balanced readouts
+are 0.855 and 0.849 for 4B and 8B, versus scorer accuracies of 0.867 and
+0.883.
+
+These comparisons do not prove that label count explains the whole
+full-training difference. They do show that the observed advantage is not
+established as supervision-independent. The refit metadata declares label
+counts and subset protocols, but the exact balanced subset identities and
+the cache-refit generator have not been recovered. We treat these as
+documented existing measurements, not a fully reproduced identical-example
+experiment.
+
+Figure~\ref{fig:descriptive-budget} shows these refits alongside the
+requested-shot curves and the full-training readout reference.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{figures/boolq_results.png}
-\caption{\textbf{BoolQ: \head{} vs loop} across six models (full val).}
-\label{fig:boolq}
+\includegraphics[width=\textwidth]{figures/descriptive_budget.pdf}
+\caption{\textbf{BoolQ supervision-budget descriptions.}
+At $n=k\in\{8,16,32,64\}$, readout curves show first-$n$ and class-balanced
+refit means with seed SD; scorer curves show requested-$k$-shot accuracy.
+Dashed lines mark the 9427-label readout mean, not a matched-budget arm.
+Equal counts do not certify identical examples or retained demonstrations;
+readout/scorer token caps are 384/8192. Lines connect recorded settings,
+not fitted scaling laws. Sources match Table~\ref{tab:budget}.}
+\label{fig:descriptive-budget}
 \end{figure}
 
-\subsection{Extra in-context shots do not close the gap}
-
-The natural objection: the head sees thousands of labels, the loop sees $k$
-exemplars. We gave the loop its budget back --- $k$ swept to 64 balanced
-exemplars at $4\times$ pad (8192) --- at 0.6B/4B/8B. The loop's $k$-curve
-\textbf{plateaus by $k{=}32$} (loop.64 $-$ loop.32 $=-0.0003$, $p=1.00$ at
-0.6B) and \textbf{never passes the \head{} where the \head{} was winning}: at
-0.6B the \head{}'s $+3.0$pt over the best loop stays significant
-($p=3.2\mathrm{e}{-05}$); at 4B/8B all cells are exact ties. More in-context
-supervision does not explain the 0.6B win (Fig.~\ref{fig:kcurve}).
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{figures/boolq_budget_kcurve.png}
-  \caption{\textbf{Supervision budget.} The loop's $k$-curve plateaus
-by $k{=}32$ and never passes the \head{} on BoolQ.}
-\label{fig:kcurve}
-\end{figure}
-
-\subsection{Readings}
-
-\begin{enumerate}
-\item \textbf{Parity or better at five of six models; the edge is largest
-  where the model is weakest.} The \head{}'s only significant win is at 0.6B
-  --- the loop's verbal channel is the bottleneck there, and the \head{}
-  channel saturates before it. Mistral-7B is the exception (loop $+2.2$pt).
-\item \textbf{The signal is distributed, not localized.} Random-projection
-  heads retain accuracy (perm $\approx$ max $\gg$ noise) at every scale; no
-  privileged subspace carries the verdict (Table~\ref{tab:controls}).
-\item \textbf{The verdict concentrates in the final token.} Mean-pooled
-  full-context \head{}s underperform the final-token \head{} everywhere
-  (full-context $\ll$ final-token) --- the answer is computed into the final
-  state, not read off the passage.
-\item \textbf{The readout is essentially linear.} A multinomial logistic
-  \head{} tracks the MLP within a few points at every scale (BoolQ 0.6B
-  linear.max 0.750 vs MLP 0.747; 8B 0.874 vs 0.881), so the verdict is a
-  near-\emph{linear} read of the residual, not a fragile nonlinear probe. At
-  0.6B, where the residual does not yet hold the answer (ARC $\approx$0.49,
-  near chance), no head can invent it --- the \head{} reads what is there.
-\end{enumerate}
-
-\emph{Context length.} The \head{} reads at $\mathrm{pad\_max}=384$ against
-the loop's 2048--8192. Because the BoolQ gold answer is grounded in the
-passage, left-truncation could in principle drop long passages
-asymmetrically; we do not log per-row truncation rates and flag this as a
-limitation (\S\ref{sec:limits}), noting the length-tercile check in
-\S\ref{sec:setup} shows no length-dependent accuracy collapse.
-
-\subsection{Scoring vs decoding}
-
-Readout and scoring loop are both one context forward pass, unequal only in
-context length. A decode loop is a different, more expensive readout. In a
-small check, greedy decode from an ``Answer:'' prompt hit the length cap
-(25/25 at 300 tokens on 0.6B; 7/8 at 1000 tokens on DeepSeek-V4). That is
-not a latency benchmark.
-
-\section{RuleTaker and ARC: serial depth and parametric knowledge}
+\subsection{RuleTaker and ARC-Challenge}
 \label{sec:tasks}
 
-BoolQ is passage-grounded. We test the two ways a task can be harder for a
-one-pass \head{}: \textbf{serial deduction depth} (RuleTaker) and
-\textbf{parametric knowledge with no passage} (ARC-Challenge).
+On the 4000-row RuleTaker evaluation subset, the final-layer classifier
+mean is higher than the eight-shot scorer for five models. Differences
+range from approximately $+4.6$ to $+11.9$ percentage points. DeepSeek's
+classifier is lower by about 1.6 points. Zero-shot scoring is higher than
+eight-shot scoring for Qwen3-0.6B; against zero-shot its readout difference
+is about $+9.0$ rather than $+10.3$ points. The main table keeps both scorer
+arms visible rather than selecting one using evaluation accuracy.
 
-\subsection{RuleTaker 10k/4k: matched loop rows, per-depth strata}
+The stored RuleTaker \texttt{depth} field is parsed from the release's
+configuration name, not measured from a proof for each question. In
+particular, \texttt{depth-3}, \texttt{depth-3ext}, and
+\texttt{depth-3ext-NatLang} contribute to the same numeric group. We do
+not interpret the historical configuration-stratified results as an
+experiment isolating question-level deduction depth, nor infer a serial
+reasoning threshold from them.
 
-RuleTaker \citep{clark2020ruletaker} is closed-world rule reasoning with
-labeled deduction depth (0/1/2/3/5 $+$ NatLang), loaded via Hugging Face
-\texttt{tasksource/ruletaker}. Protocol: 10000 train / 4000 val (subsample of
-the full release), loop on the same 4000 rows, $k\in\{0,8\}$,
-batch 8. On Qwen, the matched one-pass MLP \textbf{beats
-the fair loop at every scale} ($+4.6$ to $+9.2$pt; all $p{<}10^{-8}$; 0.6B
-prefers zero-shot, 4B/8B prefer 8-shot). The cross-family models sharpen the picture:
-Mistral-7B $+11.1$pt ($p=4.2\mathrm{e}{-28}$), \textbf{Granite-3.1-8B $+11.9$pt
-($p=1.1\mathrm{e}{-45}$) --- the largest \head{} margin we measure.} The
-one clean loop win is DeepSeek-V4 ($-1.6$pt,
-$p=0.029$), driven by the shallow-depth strata.
+On ARC, the eight-shot scorer is numerically higher in all six cases.
+The largest gaps occur for Qwen3-0.6B (about 10.6 points) and Granite
+(8.2 points); the Qwen3-8B gap is about 0.4 points. These observations do
+not establish a causal role for model size, knowledge retrieval, or task
+format learning. Readout accuracy and its difference from the scorer
+also share a term mathematically, so their association alone is not an
+independent explanation. Qwen3-0.6B's readout accuracy of 0.492 is well
+above the 0.25 uniform-guess baseline for four choices; its lower accuracy
+does not show that no other classifier could extract useful information.
 
-\textbf{Per-depth} (same rows): no sharp ``only the loop works past depth
-$D$'' cliff. Accuracy degrades gradually with depth; $d{=}5$ remains well
-above chance. The DSV4 loop win concentrates at shallow depths ($d0/d1$,
-$+5$--$11$pt); at 0.6B the loop lags at depth ($d5$ loop.8
-0.522 vs.\ \head{} 0.625). Depth bins are $n{=}211$--$1946$ ($d3$ dominates)
-(Fig.~\ref{fig:depth}).
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{figures/ruletaker_depth_strata.png}
-\caption{\textbf{RuleTaker overall $+$ per-depth strata}, \head{} vs loop.}
-\label{fig:depth}
-\end{figure}
-
-\subsection{ARC-Challenge: the loop's best case}
-
-ARC-Challenge \citep{clark2018arc} is the hard partition of the AI2 Reasoning
-Challenge (not Chollet's Abstraction \& Reasoning Corpus): grade-school science
-multiple-choice questions that retrieval and co-occurrence baselines miss. We
-load \texttt{allenai/ai2\_arc} config \texttt{ARC-Challenge} and keep 4-choice
-A--D items only ($\sim$99\% of the set). Answers are parametric science
-knowledge with no passage --- they must come from the weights, not the
-context. On Qwen the loop beats the one-pass classifier at 0.6B ($-10.6$pt)
-and 4B ($-4.1$pt; both $p<1\mathrm{e}{-05}$). At 8B and DeepSeek-V4 the
-gap is gone ($-0.4$pt and $-1.0$pt, both ns). Cross-family
-models sit with Qwen at matched readout accuracy, not matched size:
-Mistral-7B $-5.1$pt ($p=9.3\mathrm{e}{-05}$), Granite-8B $-8.2$pt
-($p=5.8\mathrm{e}{-10}$). Few-shot exemplars teach a task format the residual
-head must otherwise learn from labels; the gap shrinks as probe accuracy
-rises.
-
-\subsection{The task-type regularity}
-
-Across 18 task$\times$model cells the organizing fact is capability on ARC,
-not three special regimes (Fig.~\ref{fig:tasklaw}). \textbf{The loop wins
-on ARC when the one-pass classifier is still weak} (Qwen 0.6B/4B, Mistral,
-Granite). Elsewhere the one-pass \head{}
-wins or ties, with two exceptions: DeepSeek-V4 on RuleTaker and Mistral-7B
-on BoolQ. Granite/Mistral sit where Qwen did at equal ARC accuracy, not
-equal size. The Mistral BoolQ cell is a single-model exception we flag
-rather than explain (\S\ref{sec:discussion}).
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/tasklaw_summary.png}
-\caption{\textbf{Readout $-$ best loop} (paired, same rows) per
-task$\times$model cell, with McNemar significance. The loop's significant
-wins cluster on ARC at low probe accuracy, plus DeepSeek-V4
-RuleTaker and Mistral-7B BoolQ.}
-\label{fig:tasklaw}
-\end{figure*}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{figures/head_to_head_three_tasks.png}
-\caption{\textbf{Three-task head-to-head} (BoolQ $\cdot$ RuleTaker $\cdot$
-ARC) across models.}
-\label{fig:h2h}
-\end{figure}
-
-\subsection{Readout placement: information across depth}
+\subsection{Exploratory layer sweeps}
 \label{sec:placement}
 
-Every headline number above taps the final residual layer. We swept the tap
-across depth (10 layers, paired McNemar vs the final-layer \head{}, trained
-heads persisted at every tap). The curve is the same everywhere: monotone
-rise, mid-depth plateau, slight terminal decline (Table~\ref{tab:placement},
-Fig.~\ref{fig:placement}). A high mid-depth readout accuracy means the residual
-already contains extractable answer-relevant information; it does not mean
-the intermediate LM head is correct, or that stopping there reproduces
-full-model behavior.
+Table~\ref{tab:placement} summarizes the recorded layer sweeps using the
+highest seed-mean accuracy among the swept layers and the final-layer
+readout from the same source run. Intermediate layers can support useful
+classifiers: for example, the recorded RuleTaker Mistral sweep has a
+selected mean of 0.732 at layer 16 versus 0.682 at the final layer.
+The selected layer varies across models and tasks; several ARC maxima
+occur at the final layer.
 
-\begin{itemize}
-\item \textbf{The final-layer readout is not the best readout.} Mid-depth taps
-  beat the final layer significantly at \textbf{11/18 cells and never lose
-  significantly} --- the headline numbers were a lower bound on what a
-  gold-label \head{} can extract, not a claim that later layers add nothing.
-  Across the 18 cells, 10 survive a Benjamini--Hochberg FDR correction at
-  $q<0.05$ (only BoolQ 4B drops); the ``never loses'' direction is unchanged.
-\item \textbf{The optimum is task-stable, not scale-driven.} BoolQ/RuleTaker
-  peak at 50--86\% depth at every scale; RuleTaker's Qwen and DeepSeek-V4
-  optima sit at $\sim$2/3 depth, while Mistral peaks at mid-stack (L16/32).
-  ARC drifts to the final layer at $\ge$8B ---
-  once the parametric answer saturates the residual, late-layer specialization
-  stops costing anything.
-\item \textbf{A mid-layer tap can beat the final-layer tap.} Where the loop
-  catches the final-layer \head{} (BoolQ 8B: L35 ties the loop), the best
-  mid-layer tap beats the final layer (L30 $+1.1$pt vs L35, $p=0.016$;
-  Granite L20 $+1.4$pt vs final, $p=1\mathrm{e}{-03}$). That is not
-  automatically a win against the loop (BoolQ 8B L30 0.889 vs best loop
-  0.886).
-\item \textbf{Wide-shallow plateaus earlier.} Mistral ($32{\times}4096$)
-  onsets at 35--58\% depth vs Qwen3-8B's uniform 69\% at the same width --- at
-  fixed width, the shallower stack yields a usable label signal sooner. Granite
-  ($40{\times}4096$, deep) sits between the two.
-\end{itemize}
+Selection uses the same evaluation labels on which accuracy is reported,
+so the selected maxima are optimistic estimates of a layer-selection
+procedure's generalization. A paired test at the selected layer, followed
+only by correction across the 18 cells, would not account for the
+within-cell layer search. We therefore report neither selection-unadjusted
+significance nor a claim that intermediate layers never lose. These sweeps
+describe predictive readouts, not the behavior of a backbone stopped early.
 
-\begin{figure*}[t]
+Figure~\ref{fig:descriptive-layers} displays all recorded MLP sweep points
+rather than highlighting evaluation-selected maxima.
+
+\begin{figure}[p]
 \centering
-\includegraphics[width=\textwidth]{figures/layersweep_placement.png}
-\caption{\textbf{Readout probe-placement sweeps} (18 cells). One-pass \head{}
-accuracy vs tapped residual layer; loop arms as horizontal references; paired
-McNemar annotation per panel. Mid-depth taps win significantly at 11/18 cells
-and never lose.}
-\label{fig:placement}
-\end{figure*}
-
-\emph{Causal hedge.} The monotone-rise $\to$ plateau $\to$ terminal-decline
-shape is \emph{consistent with} late-layer specialization toward next-token
-surface form or confidence correction, but we do not demonstrate it: we never
-ablated deep layers against generation, never measured calibration vs.\
-correctness by layer, and never probed next-token structure per layer. Three
-claims should not be conflated: (i)~the intermediate LM head predicts the
-correct token; (ii)~a small readout can extract the gold answer from $h_l$;
-(iii)~stopping at layer $l$ reproduces full-model behavior. The placement
-sweep addresses (ii). Inferring (iii) from (ii) is the early-exit claim, and
-it is prior art we do not make (\S\ref{sec:related}).
-
-\section{The boundary: where the loop could win, and why it doesn't cleanly here}
-\label{sec:boundary}
-
-A single forward pass is a bounded-depth computation (TC$^0$ in the circuit-
-complexity framing); the loop's advantage should appear exactly where serial
-depth is irreducible. We hunted that regime and found it only weakly
-exhibitable on frozen base weights:
-
-\begin{itemize}
-\item \textbf{RuleTaker per-depth} shows a gentle slope, not a regime switch
-  --- the loop edges the \head{} by a few points at $d{=}5$ (noisy thin bins),
-  and the one decisive loop win (DSV4) concentrates at \emph{shallow} depths,
-  where the frontier model's in-context deduction is strong.
-\item \textbf{ARC} shows the loop's real advantage is \emph{parametric
-  retrieval under a learned task format}, not serial compute --- and it closes
-  with scale.
-\item \textbf{Synthetic mechanism} (multi-hop transitivity with shuffled
-  facts; Fig.~\ref{fig:synthetic}): the relation is linearly decodable from
-  the frozen residual (0.93--0.97) where the zero-shot decoder sits at chance;
-  a 2-demo budget surfaces the loop's inference but never exceeds the one-pass
-  MLP. The measured limit is \textbf{order-locked binding}, not depth.
-\end{itemize}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{figures/synthetic_multihop.png}
-\caption{\textbf{Mechanism (synthetic).} Multi-hop transitivity: one-pass
-\head{} vs decoder loop across Qwen3 scale. The loop never exceeds a one-pass
-\head{}.}
-\label{fig:synthetic}
+\includegraphics[width=\textwidth]{figures/descriptive_layers.pdf}
+\caption{\textbf{Exploratory layer sweeps.}
+Curves connect recorded MLP seed means; bands show $\pm$ seed SD, not
+confidence intervals. Diamonds mark the final-layer readout from the same
+sweep JSON, including the separately stored ARC Qwen3-0.6B final L27.
+Sources match Table~\ref{tab:placement}, not necessarily the headline runs.
+Layer indices are zero-based. No winning layer or significance is marked;
+evaluation-selected maxima are not held-out gains.}
+\label{fig:descriptive-layers}
 \end{figure}
 
-The remaining ``loop wins'' cell --- a TC$^0$-hard task on which a
-\emph{frozen} loop decisively beats one-pass --- is largely unoccupied in our
-sweep; the counter-position (COCONUT, looped-latent) buys serial depth by
-\emph{training}, which is out of scope here. Because RuleTaker is a 10k/4k
-subsample of the official release ($d3$ fat), we treat the serial-depth
-boundary as \emph{indicative}: it shows where a TC$^0$ gap would appear
-but does not pin its location on the full test.
+\subsection{Control readouts}
 
-\section{Discussion}
+Table~\ref{tab:controls} gives label-shuffle, random-projection, noise,
+and mean-pooled-context results. Context pooling averages all retained
+nonpadding prompt tokens, not just passage tokens. Shuffling training labels generally
+reduces predictive accuracy, but this is not a dataset-overlap audit and
+does not rule out leakage. On imbalanced datasets, uniform guessing and
+majority-class prediction have different expected accuracies.
+
+Gaussian projections retain substantial predictive accuracy at the tested
+dimensions. The reported dimension is selected on evaluation accuracy;
+these are descriptive results. An isotropic Gaussian projection is
+distributionally invariant to a coordinate permutation, so similar
+permuted-coordinate results cannot establish that no privileged subspace
+exists. Finally, the tested mean-pooled-context MLPs are less accurate
+than the final-token MLPs. This is a comparison of feature summaries,
+not evidence that a verdict is causally computed at the final token or
+that passage-level shortcuts are absent.
+
+\section{Discussion and Limitations}
 \label{sec:discussion}
-
-On closed-set classification with a fixed answer set, a single prompt forward
-pass is enough: a small head on the frozen residual matches a fair
-autoregressive classifier on most of this task class, so the answer is often
-already in the vector. The loop still wins on ARC when the probe is weak,
-and in two other cells (\S\ref{sec:boundary}).
-
-\textbf{The residual supports a competitive closed-set classifier.} The
-\head{}'s largest margins are exactly where the loop is weakest (Granite
-RuleTaker $+11.9$pt; 0.6B BoolQ and RuleTaker) --- the \head{} channel saturates
-before the verbal channel. This matches the
-internal-knowledge/external-behavior disconnect
-\citet{orgad2025know} document and \citet{gekhman2025insideout} formalize as
-\emph{hidden knowledge}: a producer \head{} on the prompt residual can match
-the classifier the loop provides on this task class. The \head{} is
-near-linear (\S\ref{sec:boolq}): the answer is a near-linear read of a vector
-the model already computes.
-
-\textbf{The Mistral BoolQ exception.} Mistral-7B is the one model where the
-loop significantly wins on BoolQ ($-2.2$pt, $p=2.6\mathrm{e}{-03}$). It is a
-single-model, single-task cell, and Mistral's wide-shallow stack
-($32{\times}4096$) plateaus earliest of the six models
-(\S\ref{sec:placement}), so its final-layer residual is the weakest readout
-substrate relative to its own loop.
-
-\textbf{Separability of \head{} from generative interface.} The unembedding is
-one \head{} of the residual --- a fixed, next-token-trained one. That a
-supervised head matches it is the default expectation once stated that way;
-the empirical content is \emph{where} it fails (ARC before the residual
-saturates; DeepSeek-V4 on RuleTaker)
-and that the failure modes are orderly.
-
-\textbf{Specialist frontier (acknowledged).} Fine-tuned encoder classifiers
-(RoBERTa-large $\sim$0.87, DeBERTa-v3 $\sim$0.88, T5-11B 0.91 on BoolQ)
-\textbf{beat} our 8B one-pass \head{} (0.878). Our claim is \head{}-vs-loop on
-a frozen backbone --- the comparison a serving stack faces when the weights
-are already loaded --- not \head{}-vs-fine-tuned-specialist. Where a
-specialist can be trained and shipped, it wins on raw accuracy; the \head{}'s
-economics are marginal-cost (the forward pass already happened).
-
-\textbf{What we are not claiming.} A frozen continuous latent loop works (it
-drifts); the loop never computes; we beat fine-tuned specialists; we
-shipped residual-first inference; we introduce early exit or adaptive
-computation; intermediate confidence is a stop rule; later layers can be
-skipped because a mid-depth readout is accurate. Paper~2 explores the serving
-architecture as a proposal.
-
-\section{Limitations}
 \label{sec:limits}
 
-\begin{itemize}
-\item \textbf{RuleTaker is a 10k/4k subsample} of the official release
-  (natural depth mix, $d3$ fat), not the full test; per-depth bins are
-  $n{=}211$--$1946$.
-\item \textbf{Multiple testing}: Table~\ref{tab:main}'s 18 McNemar $p$-values
-  are reported uncorrected (stars);\\
-  all 12 raw-significant cells survive the
-  Benjamini--Hochberg FDR correction at $q{<}0.05$. Placement is stricter: 1
-  of 11 raw mid-depth wins drops under the same correction (10/18 remain).
-\item \textbf{Truncation is not logged per row}: the \head{} reads at
-  $\mathrm{pad\_max}=384$ (left-truncated) against the loop's 2048--8192, and
-  we do not record the fraction of rows truncated, so a length-asymmetric
-  truncation cost on long-passage rows cannot be ruled out from the logged
-  data (the per-length deconfound shows no accuracy collapse, but it is a
-  coarse check).
-\item \textbf{Probe vs few-shot scorer}: the \head{} is fit on the training
-  split; the loop is in-context scoring, not a fine-tuned decoder. On BoolQ
-  the loop's $k$-curve plateaus by $k{=}32$ and never passes the \head{}
-  where the \head{} was winning.
-\item \textbf{Reproducibility}: per-layer heads and per-row predictions are
-  persisted; the two oldest headline runs predate
-  head persistence. MoE active-param FLOPs are unmeasured.
-\item \textbf{Scope}: closed-set classification with a fixed answer set
-  (Yes/No, A--D). The loop baseline is a scoring classifier, not
-  chain-of-thought or free-form generation. No claim transfers to open-ended
-  decoding; the finding is that one prompt forward pass \emph{suffices} for
-  this class, not that every task is one-pass.
-\end{itemize}
+The results support training task-specific classifiers on frozen states
+as one classification option. Their relative accuracy against the tested
+scorer is not uniform. More importantly, changing the readout also changes
+the training objective, supervision budget, and prompt. A difference in
+accuracy cannot be attributed solely to access to hidden representations.
+
+\textbf{Scorer validity.} The product-of-token-probabilities heuristic is
+not standard marginal answer likelihood. Correcting tokenization and
+aggregation could change the baseline rankings and numerical conclusions;
+the stored class predictions cannot quantify that change. All comparative
+claims are conditional on the implemented scorer, not claims about the
+best use of the model's output distribution.
+
+\textbf{Supervision and context.} Headline label budgets are unequal.
+The BoolQ refits provide a useful qualification but cover only three models
+on one dataset, with incomplete subset provenance. Neither these results
+nor the requested-shot curves establish general sample efficiency.
+Effective demonstration counts, truncation rates, and sensitivity to
+exemplar selection and order remain unmeasured.
+
+\textbf{Evaluation and selection.} This is a retrospective descriptive
+analysis of existing runs. Evaluation sets informed earlier layer,
+hyperparameter, and reporting choices; there is no new untouched test set.
+Seed SD does not capture dataset-sampling or prompt-selection uncertainty.
+The RuleTaker results cover a sampled subset rather than its full test set.
+Duplicate and train--evaluation overlap counts have not been audited here;
+the shuffle controls do not replace those checks.
+
+\textbf{Computation and mechanisms.} Both main methods use a single prompt
+forward pass, with different lengths; neither generates intermediate
+reasoning tokens. The experiments therefore do not compare one-pass
+computation with iterative computation, locate a circuit-complexity
+boundary, or explain why a particular model favors one method. We make no
+latency, throughput, early-exit, or production-serving claim, and no
+comparison to fine-tuned specialists under matched resources.
+
+\textbf{Artifact coverage.} Table sources are explicit in
+\texttt{scripts/build\_descriptive\_tables.py}, which regenerates the
+descriptive tables from stored JSONs. Sweep and headline runs are kept
+distinct even when their rounded final-layer accuracies agree. Local
+full-size paired loop/readout predictions are incomplete for BoolQ
+Qwen3-0.6B, Qwen3-8B, and DeepSeek; scalar results exist for all 18 cells.
+Persisted best-seed heads, seed means, and separately fitted vote ensembles
+are different objects and should not be substituted for one another.
 
 \section{Related Work}
 \label{sec:related}
 
-\textbf{Accessing what a frozen model knows.} \emph{Behavioral} work
-\citep{turpin2023unfaithful} shows CoT rationales can be unfaithful ---
-text-only access, no representation. \emph{Latent-belief} work reads the
-representation directly: CCS \citep{burns2022ccs} finds an unsupervised
-truth direction (belief vs.\ gold-label answer recovery), pre-CoT belief
-probes \citep{cox2026precommitted}, belief-formation timing
-\citep{boppana2026theater}, and the correctness/self-knowledge cluster
-\citep{kadavath2022know,orgad2025know,gekhman2025insideout,cencerrado2026noanswer}.
-Orgad et al.\ detect errors (and, in their \S6, re-rank 30 samples); Gekhman
-et al.\ formalize \emph{hidden knowledge} and re-rank up to 1k samples with a
-verifier probe on $h(q,a)$ --- both score \emph{candidates the model already
-emitted}, not a producer head on the prompt residual alone, and neither holds
-that head to a fairly-conditioned closed-set loop.
-\emph{Decoding-suboptimality} work
-\citep{cho2025hidden,buckmann2024logistic,abbas2024linc,cho2023palp} and,
-closest, \citet{hazenoot2026esg} show hidden-state \head{}s beat the
-token-probability decision rule or zero-shot prompting --- baselines their own
-analyses show are weak. \emph{Probe-for-verification} work
-\citep{ni2026reprobe} uses internal states to improve generation, not replace
-it.
+\textbf{Frozen representations for prediction.} Prior work studies
+differences between hidden-state classifiers and prompted or token-level
+decisions \citep{cho2025hidden,buckmann2024logistic,abbas2024linc,cho2023palp}.
+\citet{hazenoot2026esg} compare frozen-activation probes with prompted
+yes/no predictions for ESG concept measurement. Our study adds a
+cross-model, three-dataset comparison under the particular protocols
+described here, not a new claim that supervised probes can predict task
+labels.
 
-\textbf{Residual-stream lenses and representation tools} ask \emph{what} a
-layer already encodes, not whether a small gold-label \head{} matches a fair
-loop as a classifier. The logit lens \citep{nostalgebraist2020logitlens} and
-tuned lens \citep{belrose2023tunedlens} decode intermediate residuals toward
-the vocabulary; Patchscopes \citep{ghandeharioun2024patchscopes} and
-representation engineering \citep{zou2023repeng} intervene on or read
-directions for interpretability and control. We measure gold-answer accuracy
-of a frozen-residual \head{} vs.\ the same model's few-shot scorer.
+\textbf{Beliefs and correctness.} CCS \citep{burns2022ccs} studies
+unsupervised recovery of truth-related directions; other work examines
+belief timing and self-knowledge
+\citep{cox2026precommitted,boppana2026theater,kadavath2022know}.
+Correctness prediction, candidate reranking, and hidden-knowledge studies
+\citep{orgad2025know,gekhman2025insideout,cencerrado2026noanswer,ni2026reprobe}
+address related but distinct targets. Our classifier predicts gold task
+labels from a prompt representation; that operational distinction does
+not identify the model's beliefs or prove that its output hides an
+already-computed answer.
 
-COCONUT \citep{hao2024coconut} and looped-latent transformers
-\citep{saunshi2025looped} \emph{train} a continuous latent loop to buy serial
-depth --- they set the boundary we test without training. Early-exit and
-adaptive computation are established
-\citep{xin2020deebert,zhou2020pabee,schuster2021cat,schuster2022calm,elhoushi2024layerskip,chen2023eellm,fan2025adainfer,wei2025adadecode}:
-they decide \emph{when to stop} from intermediate predictions or confidence.
-We measure how much gold-label information a small readout can extract from
-intermediate residuals --- representation sufficiency, not a license to skip
-later layers. Intermediate confidence is not automatically a reliable stop
-rule \citep{zhou2020pabee,wen2026specbound}; later layers may refine
-calibration after a decision is already linearly readable
-\citep{joshi2025calibration}; and early-exit opportunity is not universal in
-modern LLMs, especially MoE models \citep{wei2026diminishing}.
-Trajectory-dynamics probes \citep{damirchi2026tat} read layer-wise
-displacement across all tokens for OOD monitoring --- a richer readout than
-our static one, aimed at a different goal.
+\textbf{Layerwise readouts and adaptive computation.} The logit lens
+\citep{nostalgebraist2020logitlens} and tuned lens
+\citep{belrose2023tunedlens} map intermediate representations toward
+vocabulary predictions. Patchscopes \citep{ghandeharioun2024patchscopes}
+and representation engineering \citep{zou2023repeng} provide additional
+tools for inspecting or intervening on representations. Our supervised
+layer sweeps measure a different readout objective. Early-exit methods
+\citep{xin2020deebert,zhou2020pabee,schuster2022calm,elhoushi2024layerskip}
+evaluate stopping policies, which we do not implement. Likewise,
+continuous latent reasoning and looped transformers
+\citep{hao2024coconut,saunshi2025looped} involve trained iterative
+computation absent from our main comparison.
 
 \section{Conclusion}
 
-On closed-set classification with a fixed answer set, a single prompt forward
-pass is enough: a small \head{} head fit to the frozen residual recovers the
-answer without generating tokens --- and matches the strongest
-\emph{closed-set scoring} use of the autoregressive loop on BoolQ and
-RuleTaker, except two cells. On ARC the loop wins when the one-pass
-classifier is still weak (Qwen $-10.6 \to -0.4$pt; Granite-8B still $-8.2$pt).
-The remaining BoolQ cells are statistical ties (four of six within
-$\pm$1.2pt). The readout is near-linear: the answer is a near-linear read of
-a vector the model already computes.
+Across the evaluated models and datasets, supervised classifiers on frozen
+final-layer states and the implemented few-shot answer-token heuristic
+have different strengths. The full-training readout is numerically higher
+in most RuleTaker cases, whereas eight-shot scoring is higher in all ARC
+cases. Existing BoolQ small-label-budget refits favor the scorer and
+prevent interpreting the full-training results as a supervision-independent
+readout advantage. Exploratory layer and control analyses document
+predictive information accessible to the tested classifiers, not a causal
+account of reasoning. The supported result is this budget- and
+protocol-specific empirical comparison, with the scorer's aggregation
+limitation made explicit.
 
 \section*{Data availability}
-Dataset releases used as-is. BoolQ \citep{clark2019boolq}
-(\texttt{google/boolq}). RuleTaker \citep{clark2020ruletaker}
-(\texttt{tasksource/ruletaker}), 10k/4k subsample. ARC-Challenge
-\citep{clark2018arc} (\texttt{allenai/ai2\_arc}, config
-\texttt{ARC-Challenge}).
+The experiments use public releases of BoolQ \citep{clark2019boolq},
+RuleTaker \citep{clark2020ruletaker}, and ARC-Challenge
+\citep{clark2018arc}, with splits, subsampling, and filtering described
+in \S\ref{sec:setup}. Stored result JSONs and the descriptive table
+generator accompany the manuscript in the repository. No new model
+inference or classifier fitting was performed for this revision.
 
 \ifdefined\AnonymousVersion
 \else
 \section*{Acknowledgments}
 Large language models assisted with running experiments and drafting this
-manuscript: Grok~4.5 (xAI), DeepSeek-V4-Flash, and Kimi~K3. The author
-designed the study, reviewed all results and text, and takes full
-responsibility for the claims.
+manuscript: Grok~4.5 (xAI), DeepSeek-V4-Flash, and Kimi~K3. OpenAI models
+assisted with the methodological audit and manuscript revision. The author
+designed the study and is responsible for reviewing the results and claims.
 \fi
 
-% ----------------------------------------------------------------- tables --
 \input{tables.tex}
 
-% ------------------------------------------------------------- references --
 \clearpage
 \begingroup
 \raggedright
