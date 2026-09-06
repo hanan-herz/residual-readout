@@ -47,8 +47,9 @@ def main():
             mean, sd = d["last.mlp"]
             assert 40 <= 100 * (mean - sd) <= 100 * (mean + sd) <= 100, (task, model)
             assert all(40 <= 100 * scorer[key] <= 100 for key in ("loop.zero", "loop.8")), (task, model)
-            ax.errorbar(100 * mean, i - 0.2, xerr=100 * sd, fmt="o", color=blue,
-                        markersize=5, capsize=2)
+            ax.errorbar(100 * mean, i - 0.2, xerr=100 * sd, fmt="none", color=blue,
+                        capsize=2, zorder=3)
+            ax.plot(100 * mean, i - 0.2, "o", color=blue, markersize=4, zorder=4)
             ax.plot(100 * scorer["loop.zero"], i, "s", color=orange, markersize=4)
             ax.plot(100 * scorer["loop.8"], i + 0.2, "^", color=green, markersize=5)
         ax.set(title=labels[task], xlabel="Accuracy (%)", xlim=(40, 100),
@@ -105,8 +106,9 @@ def main():
         final = d["meta"]["n_layers"] - 1
         mean, sd = d["last.mlp"]
         assert 20 <= 100 * (mean - sd) <= 100 * (mean + sd) <= 100, (task, model)
-        ax.errorbar(final, 100 * mean, yerr=100 * sd, fmt="D", color=orange,
-                    markersize=4, capsize=2)
+        ax.errorbar(final, 100 * mean, yerr=100 * sd, fmt="none", color=orange,
+                    capsize=2, zorder=3)
+        ax.plot(final, 100 * mean, "D", color=orange, markersize=4, zorder=4)
         ax.set(ylim=(20, 100), yticks=[20, 40, 60, 80, 100], xticks=[xs[0], final // 2, final])
         if task == "BoolQ":
             ax.set_ylabel(model + "\nAccuracy (%)", fontsize=9)

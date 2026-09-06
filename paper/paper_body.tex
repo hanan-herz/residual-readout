@@ -92,7 +92,8 @@ accuracies without presenting it as the strongest available output baseline.
 Let $h_T\in\mathbb{R}^d$ denote the last nonpadding token's output from
 the final transformer block of a frozen model, before subsequent model-level
 normalization or output processing. For DeepSeek, grouped trailing output
-dimensions are flattened into a feature vector. The prompt includes the
+dimensions are flattened into a feature vector, giving an effective input
+width of 16384 (the other model widths range from 1024 to 4096). The prompt includes the
 question and, where supplied by the task, the passage. Gold answers are not
 appended to the readout's input. Prompts are left-truncated to 384 tokens,
 retaining the prompt suffix and trailing answer slot, but not necessarily
@@ -150,12 +151,14 @@ read as comparisons against standard answer-likelihood scoring generally.
 \subsection{Supervision, context, and reporting}
 
 The main readouts use 9427 training labels on BoolQ, 10000 on RuleTaker,
-and 1000 on ARC. We report zero- and eight-shot scorer arms separately,
+and 1000 on ARC. The ARC filter leaves 1117 four-choice training rows and
+1165 test rows; the reported training set is a seed-0 subsample of 1000 rows.
+We report zero- and eight-shot scorer arms separately,
 without selecting the stronger arm for the main comparison. This is a
 reporting choice for the present descriptive analysis, not a preregistered
 experimental design. Additional BoolQ runs requested up to 64 demonstrations.
 
-The scorer's token cap is 8192 for the Qwen BoolQ budget runs and 2048
+The scorer's token cap is 8192 for Qwen BoolQ runs and 2048
 otherwise, compared with the readout's 384. Left truncation can remove
 passage content, complete demonstrations, or parts of demonstrations. The
 stored results do not measure per-row truncation or the number of retained
@@ -189,9 +192,12 @@ uses \texttt{tasksource/ruletaker}, with 10000 sampled training rows and
 4000 sampled rows from the official \emph{test} split. The artifacts call
 the latter \texttt{val}; this is an evaluation-set name, not the official
 validation split. ARC-Challenge \citep{clark2018arc} uses
-\texttt{allenai/ai2\_arc}, retaining four-choice items, with 1000 training
-and 1165 test examples. No retrieval corpus is supplied for ARC, but the
-question and choices themselves remain part of the input.
+\texttt{allenai/ai2\_arc}, retaining four-choice items, with 1117 filtered
+training rows and 1165 test rows. The reported 1000-row training set is a
+seed-0 subsample. No retrieval corpus is supplied for ARC, but the question
+and choices themselves remain part of the input.
+
+\input{tables.tex}
 
 \section{Results}
 
@@ -221,12 +227,14 @@ only slightly higher, at 0.878 versus 0.876. In the other four models the
 eight-shot scorer is numerically higher. We do not interpret the smaller
 differences as statistical ties.
 
-The existing requested-shot sweep is important context for the 0.6B result:
-its scorer rises from 0.631 at zero shots to 0.715 at both 32 and 64 shots
-(rounded), reducing the full-training readout's lead to about 3.0 percentage
-points. Similar 32- and 64-shot accuracies in this one protocol do not
-establish saturation with additional supervision: context truncation and
-the single exemplar ordering are not separately controlled.
+The existing requested-shot sweep qualifies the Qwen3-8B comparison: its
+full-training readout (0.878) is below the recorded 16-, 32-, and 64-shot
+scorer arms (0.886, 0.880, and 0.883, rounded). For Qwen3-0.6B, by contrast,
+the readout (0.746) exceeds every recorded scorer arm; its scorer rises from
+0.631 at zero shots to 0.715 at both 32 and 64 shots (rounded), reducing the
+readout's lead to about 3.0 percentage points. Similar 32- and 64-shot
+accuracies in this one protocol do not establish saturation: context
+truncation and the single exemplar ordering are not separately controlled.
 
 Table~\ref{tab:budget} reports existing cache-refit artifacts for 8, 16,
 32, and 64 training labels on the three Qwen models. They contain both
@@ -281,7 +289,13 @@ not interpret the historical configuration-stratified results as an
 experiment isolating question-level deduction depth, nor infer a serial
 reasoning threshold from them.
 
-On ARC, the eight-shot scorer is numerically higher in all six cases.
+On ARC, the eight-shot scorer is numerically higher in all six cases. The
+readout has 1000 training labels here, versus 9427 on BoolQ and 10000 on
+RuleTaker. Thus the ARC deficits are observed under a substantially smaller
+readout label budget; this asymmetry is a limitation on causal interpretation,
+not evidence that label budget explains the deficits. The 1000 ARC rows are
+most of the 1117 filtered training rows, so historical 1117-label Qwen
+results provide only corroborating, not drop-in, evidence about the endpoint.
 The largest gaps occur for Qwen3-0.6B (about 10.6 points) and Granite
 (8.2 points); the Qwen3-8B gap is about 0.4 points. These observations do
 not establish a causal role for model size, knowledge retrieval, or task
@@ -333,10 +347,12 @@ and mean-pooled-context results. Context pooling averages all retained
 nonpadding prompt tokens, not just passage tokens. Shuffling training labels generally
 reduces predictive accuracy, but this is not a dataset-overlap audit and
 does not rule out leakage. On imbalanced datasets, uniform guessing and
-majority-class prediction have different expected accuracies.
+majority-class prediction have different expected accuracies; the BoolQ
+validation majority is 0.6217.
 
 Gaussian projections retain substantial predictive accuracy at the tested
-dimensions. The reported dimension is selected on evaluation accuracy;
+dimensions (64 or 256, reported per row in Table~\ref{tab:controls}). The
+reported dimension is selected on evaluation accuracy;
 these are descriptive results. An isotropic Gaussian projection is
 distributionally invariant to a coordinate permutation, so similar
 permuted-coordinate results cannot establish that no privileged subspace
@@ -363,9 +379,13 @@ claims are conditional on the implemented scorer, not claims about the
 best use of the model's output distribution.
 
 \textbf{Supervision and context.} Headline label budgets are unequal.
-The BoolQ refits provide a useful qualification but cover only three models
-on one dataset, with incomplete subset provenance. Neither these results
-nor the requested-shot curves establish general sample efficiency.
+Stored first-$n$ readouts at $n=64$ exist for all 18 headline cells and are
+below the corresponding eight-shot scorer in 17 of 18 cells, including all
+six RuleTaker cells. This is not matched-budget evidence: RuleTaker and ARC
+have no 64-shot scorer arm, and these stored refits are first-$n$, not
+class-balanced. The BoolQ class-balanced refits provide a complementary
+qualification for three models on one dataset, with incomplete subset
+provenance. Neither result establishes general sample efficiency.
 Effective demonstration counts, truncation rates, and sensitivity to
 exemplar selection and order remain unmeasured.
 
@@ -387,8 +407,10 @@ comparison to fine-tuned specialists under matched resources.
 
 \textbf{Artifact coverage.} Table sources are explicit in
 \texttt{scripts/build\_descriptive\_tables.py}, which regenerates the
-descriptive tables from stored JSONs. Sweep and headline runs are kept
-distinct even when their rounded final-layer accuracies agree. Local
+descriptive tables from stored JSONs. Sweep and headline entries are
+distinct in the source mapping only where separate files are used; some
+entries share a file or cached computation, so the tables do not provide a
+run-to-run variability estimate. Local
 full-size paired loop/readout predictions are incomplete for BoolQ
 Qwen3-0.6B, Qwen3-8B, and DeepSeek; scalar results exist for all 18 cells.
 Persisted best-seed heads, seed means, and separately fitted vote ensembles
@@ -449,7 +471,8 @@ The experiments use public releases of BoolQ \citep{clark2019boolq},
 RuleTaker \citep{clark2020ruletaker}, and ARC-Challenge
 \citep{clark2018arc}, with splits, subsampling, and filtering described
 in \S\ref{sec:setup}. Stored result JSONs and the descriptive table
-generator accompany the manuscript in the repository. No new model
+generator accompany the manuscript in the repository at
+\url{https://github.com/hanan-herz/residual-readout-bench}. No new model
 inference or classifier fitting was performed for this revision.
 
 \ifdefined\AnonymousVersion
@@ -460,8 +483,6 @@ manuscript: Grok~4.5 (xAI), DeepSeek-V4-Flash, and Kimi~K3. OpenAI models
 assisted with the methodological audit and manuscript revision. The author
 designed the study and is responsible for reviewing the results and claims.
 \fi
-
-\input{tables.tex}
 
 \clearpage
 \begingroup

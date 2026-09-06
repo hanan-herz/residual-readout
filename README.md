@@ -28,7 +28,7 @@ supervision-matched superiority findings.
 
 ## Quickstart (no GPU)
 
-Run from the repository root. Checking the current tables requires only
+Run table checks from the repository root. Checking the current tables requires only
 Python 3's standard library, with no package installation or network access:
 
 ```bash
@@ -50,6 +50,9 @@ source .venv/bin/activate
 python3 -m pip install matplotlib
 bash paper/build.sh
 ```
+
+To compile the standalone table wrapper, run `lualatex main_tables.tex` from
+the `paper/` directory.
 
 The build checks the tables, regenerates the three descriptive PDF figures,
 and compiles the public `paper/paper.pdf`. It does not load models or fit

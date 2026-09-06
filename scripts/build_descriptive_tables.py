@@ -79,7 +79,8 @@ All entries use the headline readout JSONs and train/evaluation counts
 of Table~\ref{tab:main}. Shuffle is the stored mean for an MLP refit on
 permuted training labels (\texttt{last.mlp.shufl}); context and final are
 \texttt{ctx.mlp} and \texttt{last.mlp} seed means.
-RP max, perm, and noise are the stored \texttt{last.randproj} values:
+RP max, its dimension, perm, and noise are the stored
+\texttt{last.randproj} values:
 linear probes on Gaussian random projections, feature-column-permuted
 inputs, and Gaussian noise inputs. RP dimension is selected on evaluation
 accuracy from 64 and 256 using three-seed means; perm and noise use the
@@ -155,11 +156,13 @@ def main():
             assert layers[final]["mlp"] == sweep["last.mlp"], sweep_file
         assert int(best) == sweep["meta"]["layer_sweep_best"]["layer"], sweep_file
         rp = d["last.randproj"]
-        controls = [d["last.mlp.shufl"][0], rp["max"], rp["perm"], rp["noise"],
-                    d["ctx.mlp"][0], mean]
+        controls = [d["last.mlp.shufl"][0], rp["max"], rp["d"], rp["perm"],
+                    rp["noise"], d["ctx.mlp"][0], mean]
         assert rp["d"] in (64, 256), readout_file
         assert all(math.isfinite(v) and 0 <= v <= 1
-                   for v in [mean, sd, zero, eight, selected, final_mean, *controls]), (task, model)
+                   for v in [mean, sd, zero, eight, selected, final_mean,
+                             controls[0], controls[1], controls[3], controls[4],
+                             controls[5], controls[6]]), (task, model)
 
         if task != previous and previous is not None:
             for label in ("main", "placement", "controls"):
@@ -176,14 +179,15 @@ def main():
         ])
         rows["controls"].extend([
             f"% Readout: {readout_file}",
-            prefix + " & ".join(f"{value:.3f}" for value in controls) + r" \\",
+            prefix + f"{controls[0]:.3f} & {controls[1]:.3f} & {controls[2]} & "
+            + " & ".join(f"{value:.3f}" for value in controls[3:]) + r" \\",
         ])
         deltas.setdefault(task, []).append(delta)
         previous = task
         if args.report:
             print(f"MAIN {task} {model}: mean={mean!r}, sd={sd!r}, zero={zero!r}, eight={eight!r}, delta={delta!r}")
             print(f"PLACEMENT {task} {model}: L{best}={selected!r}, L{final}={final_mean!r}, headline_final_difference={final_mean - mean!r}")
-            print(f"CONTROLS {task} {model}: {controls!r}, rp_dimension={rp['d']}")
+            print(f"CONTROLS {task} {model}: {controls!r}")
 
     for model, name in BUDGET:
         d = sources[name]
@@ -221,7 +225,7 @@ def main():
     text = preamble + "\n".join([
         table("main", "llcccc", r"Task & Model & Readout mean $\pm$ SD & \texttt{loop.zero} & \texttt{loop.8} & $\Delta$ vs.\ 8-shot", rows["main"]),
         table("placement", "llcccc", "Task & Model & Selected layer & Selected mean & Final layer & Final mean", rows["placement"]),
-        table("controls", "llcccccc", "Task & Model & Shuffle & RP max & RP perm & RP noise & Context & Final", rows["controls"]),
+        table("controls", "llccccccc", "Task & Model & Shuffle & RP max & RP d & RP perm & RP noise & Context & Final", rows["controls"]),
         table("budget", "lcccc", r"Model & $n=k$ & First-$n$ refit & Class-balanced refit & \texttt{loop.k}", rows["budget"]),
     ])
     if args.report:
