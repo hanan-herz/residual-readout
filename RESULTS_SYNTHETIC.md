@@ -4,7 +4,7 @@
 > measurements and interpretations below are retained for provenance, not as
 > current conclusions. See the [current results summary](RESULTS.md), including
 > its [samek caveats](RESULTS.md#samek-caveats), and the
-> [revised paper](paper/paper.pdf) for the supported descriptive comparison.
+> [revised paper](paper/paper.pdf) for the supported regime map and its protocol caveats.
 
 Mechanism experiments on synthetic tasks (multi-hop transitivity, arithmetic,
 semantic roles, closed-set extraction, latent-loop drift). Small-n (700 train /

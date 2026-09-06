@@ -1,10 +1,13 @@
 # Results: Revised-Paper Summary
 
-The [main paper PDF](paper/paper.pdf) reports a retrospective, descriptive
-comparison of supervised classifiers on frozen final-token residual states
-and an implemented zero-/few-shot answer-token scorer. Both methods use one
-prompt forward pass, not iterative generation; their supervision and inputs
-differ. No new inference or classifier fitting was performed for the revision.
+The [main paper PDF](paper/paper.pdf) reports a retrospective comparison of
+supervised classifiers on frozen final-token residual states and an implemented
+zero-/few-shot answer-token scorer. The central finding is a regime map:
+readouts are strongest relative to scoring on RuleTaker and BoolQ, while
+scoring has its clearest advantage on ARC when the residual readout is weak.
+Both methods use one prompt forward pass, not iterative generation; their
+supervision and inputs differ. No new inference or classifier fitting was
+performed for the revision.
 
 ## Current Results
 
@@ -19,7 +22,8 @@ differences use `loop.8`, not the best available loop arm.
 | RuleTaker | 10000 / 4000 / 4000 | 5 of 6 models |
 | ARC-Challenge | 1000 / 1165 / 1165 | 0 of 6 models |
 
-These are numerical comparisons, not significance or equivalence findings.
+These are numerical comparisons supporting a regime pattern, not significance
+or equivalence findings.
 BoolQ uses its validation split; RuleTaker uses a sampled official test subset;
 ARC uses four-choice test items. Readout token caps are 384; scorer caps are
 8192 for Qwen BoolQ and 2048 otherwise. Requested shots are not measured

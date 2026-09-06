@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this work, please cite it."
-title: "Supervised Residual Readouts versus Few-Shot Answer-Token Scoring"
+title: "When Is the Vector Enough? Frozen Residual Readouts versus Answer-Token Scoring"
 authors:
   - family-names: Herzog
     given-names: Hanan

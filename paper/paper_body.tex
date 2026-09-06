@@ -1,5 +1,5 @@
-\title{\textbf{Supervised Residual Readouts versus\\
-Few-Shot Answer-Token Scoring}}
+\title{\textbf{When Is the Vector Enough?\\
+Frozen Residual Readouts versus Answer-Token Scoring}}
 \ifdefined\AnonymousVersion
 \author{Anonymous Author(s)}
 \date{}
@@ -15,28 +15,27 @@ Few-Shot Answer-Token Scoring}}
 \maketitle
 
 \begin{abstract}
-Frozen language-model representations can serve as features for supervised
-classification. We report a descriptive comparison between a small classifier
-trained on final-token residual states and a zero-/few-shot answer-token
-scoring heuristic, across six open-weight models on BoolQ, RuleTaker, and
-ARC-Challenge. The backbone is unchanged in both methods, but their
-task-specific supervision and prompt lengths differ. Relative to the fixed
-eight-shot arm, the final-layer classifier has higher mean accuracy in five
-of six RuleTaker cases, two of six BoolQ cases, and none of the six ARC cases.
-These are numerical comparisons, not equivalence or significance findings.
-Existing BoolQ label-budget refits qualify the full-training results: at
-each recorded budget of 8, 16, 32, and 64 labels, both refit protocols have
-lower mean accuracy than the corresponding requested-shot scorer across
-the three tested Qwen models.
+When does a language model's frozen residual already support the answer, and
+when does answer-token scoring add value? We compare a small supervised
+classifier on final-token residual states with zero-/few-shot closed-set
+answer-token scoring across six open-weight models on BoolQ, RuleTaker, and
+ARC-Challenge. The methods use the same frozen backbone but different task
+supervision and prompt lengths. Their relative performance is structured
+rather than universal: the final-layer readout is higher than requested
+eight-shot scoring in five of six RuleTaker cases and two of six BoolQ cases,
+whereas scoring is higher in all six ARC cases. On ARC, the scorer's advantage
+falls from 10.6 points for Qwen3-0.6B to 0.4 points for Qwen3-8B as the
+readout becomes more predictive.
 
-The stored scorer sums log-probabilities of alternative answer tokens; it
-does not marginalize their probability mass. Our comparisons therefore
-apply to that implemented heuristic, not to a corrected likelihood baseline.
-Exploratory layer sweeps and control readouts describe predictive information
-accessible to the tested classifiers, without identifying a reasoning
-mechanism or establishing an advantage independent of supervision. Together,
-the results document model-, task-, and budget-dependent performance under
-the evaluated protocols.
+Existing BoolQ small-budget refits qualify the result: the full-training
+readout advantage is not established as supervision-independent. Intermediate
+layer sweeps show that answer-relevant information is often accessible before
+the final layer, although evaluation-selected maxima do not establish held-out
+gains or early exit. The scorer is the stored product-of-token-probabilities
+heuristic, not marginalized answer likelihood or free-form generation. The
+contribution is therefore a protocol-specific regime map: readouts are often
+competitive on rule- and passage-grounded tasks, while scoring is most useful
+when the residual readout is still weak.
 \end{abstract}
 
 \section{Introduction}
@@ -58,24 +57,25 @@ number of labeled demonstrations in its prompt. The scorer is allowed a
 longer context, which can preserve more passage text and demonstrations but
 does not compensate in a controlled way for the classifier's training labels.
 
-Our contribution is a descriptive comparison over six models and three
-datasets, with existing budget refits and exploratory representation analyses.
-It is not a new probing method, a supervision-matched superiority result,
-or a test of iterative reasoning. The main observations are:
+Our contribution is a cross-model, cross-task map of when these two readouts
+separate, together with a supervision-budget qualification and layerwise
+readouts. This is not a supervision-matched superiority result or a test of
+generated iterative reasoning. The main observations are:
 \begin{enumerate}
-\item \textbf{Relative accuracy varies by task and model.} The final-layer
+\item \textbf{The loop's value is regime-dependent.} The final-layer
 classifier is numerically higher than the fixed eight-shot scorer in five
 RuleTaker cases and two BoolQ cases, while the scorer is higher in all six
-ARC cases. The magnitudes vary substantially (Table~\ref{tab:main}).
+ARC cases. The largest scorer gaps occur where the readout is weakest, and
+the ARC gap narrows as readout accuracy rises (Table~\ref{tab:main}).
 \item \textbf{Supervision changes the comparison.} In the existing BoolQ
 refits, matching the number of classifier training labels to the requested
 number of demonstrations does not preserve the full-training classifier's
 advantage (Table~\ref{tab:budget}). These artifacts match declared counts,
 not independently verified example identities or retained prompt counts.
-\item \textbf{Intermediate states support predictive readouts.} Some
-evaluation-selected intermediate layers have higher readout accuracy than
-the final layer. These exploratory maxima do not establish held-out gains
-from layer selection or justify stopping the backbone early
+\item \textbf{Answer-relevant information is often accessible before the
+final layer.} Several intermediate layers support higher readout accuracy
+than the final layer. These evaluation-selected maxima do not establish
+held-out gains from layer selection or justify stopping the backbone early
 (Table~\ref{tab:placement}).
 \end{enumerate}
 
@@ -220,12 +220,14 @@ differ (Table~\ref{tab:main}). No significance tests are shown.}
 \subsection{BoolQ: full-training and small-budget readouts}
 \label{sec:boolq}
 
-Table~\ref{tab:main} shows substantial variation in the final-layer
-classifier's relation to the fixed eight-shot scorer. Qwen3-0.6B has a
-classifier mean of 0.746 versus 0.645 for eight-shot scoring; Qwen3-8B is
-only slightly higher, at 0.878 versus 0.876. In the other four models the
-eight-shot scorer is numerically higher. We do not interpret the smaller
-differences as statistical ties.
+Table~\ref{tab:main} shows that BoolQ is a mixed but informative regime.
+Qwen3-0.6B has a classifier mean of 0.746 versus 0.645 for eight-shot
+scoring, while Qwen3-8B is nearly even at 0.878 versus 0.876. The other
+models favor scoring numerically, so the result is not a universal readout
+win. It is nevertheless consistent with the broader map: once both channels
+are strong, their difference is small; where the residual readout is weaker,
+the scorer can retain an advantage. Small differences are not interpreted as
+statistical ties.
 
 The existing requested-shot sweep qualifies the Qwen3-8B comparison: its
 full-training readout (0.878) is below the recorded 16-, 32-, and 64-shot
@@ -274,12 +276,15 @@ not fitted scaling laws. Sources match Table~\ref{tab:budget}.}
 \label{sec:tasks}
 
 On the 4000-row RuleTaker evaluation subset, the final-layer classifier
-mean is higher than the eight-shot scorer for five models. Differences
-range from approximately $+4.6$ to $+11.9$ percentage points. DeepSeek's
-classifier is lower by about 1.6 points. Zero-shot scoring is higher than
-eight-shot scoring for Qwen3-0.6B; against zero-shot its readout difference
-is about $+9.0$ rather than $+10.3$ points. The main table keeps both scorer
-arms visible rather than selecting one using evaluation accuracy.
+mean is higher than the eight-shot scorer for five models, with differences
+from approximately $+4.6$ to $+11.9$ percentage points. This is the clearest
+readout-favorable regime in the study: a task-grounded classifier on the
+frozen residual substantially improves on the stored answer-token decision
+rule for several backbones. DeepSeek's classifier is lower by about 1.6
+points, showing that the pattern is not universal. Zero-shot scoring is higher
+than eight-shot scoring for Qwen3-0.6B; against zero-shot its readout
+difference is about $+9.0$ rather than $+10.3$ points. The main table keeps
+both scorer arms visible rather than selecting one using evaluation accuracy.
 
 The stored RuleTaker \texttt{depth} field is parsed from the release's
 configuration name, not measured from a proof for each question. In
@@ -289,32 +294,30 @@ not interpret the historical configuration-stratified results as an
 experiment isolating question-level deduction depth, nor infer a serial
 reasoning threshold from them.
 
-On ARC, the eight-shot scorer is numerically higher in all six cases. The
-readout has 1000 training labels here, versus 9427 on BoolQ and 10000 on
-RuleTaker. Thus the ARC deficits are observed under a substantially smaller
-readout label budget; this asymmetry is a limitation on causal interpretation,
-not evidence that label budget explains the deficits. The 1000 ARC rows are
-most of the 1117 filtered training rows, so historical 1117-label Qwen
-results provide only corroborating, not drop-in, evidence about the endpoint.
-The largest gaps occur for Qwen3-0.6B (about 10.6 points) and Granite
-(8.2 points); the Qwen3-8B gap is about 0.4 points. These observations do
-not establish a causal role for model size, knowledge retrieval, or task
-format learning. Readout accuracy and its difference from the scorer
-also share a term mathematically, so their association alone is not an
-independent explanation. Qwen3-0.6B's readout accuracy of 0.492 is well
-above the 0.25 uniform-guess baseline for four choices; its lower accuracy
-does not show that no other classifier could extract useful information.
+On ARC, the eight-shot scorer is numerically higher in all six cases. This is
+the clearest scorer-favorable regime, but its size is organized by readout
+competence: the gap is about 10.6 points for Qwen3-0.6B, 4.1 points for
+Qwen3-4B, and 0.4 points for Qwen3-8B. Granite remains an exception at an
+8.2-point gap despite a stronger model, while DeepSeek is nearly even. The
+pattern is an empirical association, not a causal size law: readout accuracy
+and readout-minus-scorer share a term mathematically, and the readout has only
+1000 training labels here versus 9427 on BoolQ and 10000 on RuleTaker. The
+1000 ARC rows are most of the 1117 filtered training rows, so historical
+1117-label Qwen results provide only corroborating, not drop-in, evidence
+about the endpoint. Qwen3-0.6B's readout accuracy of 0.492 is well above the
+0.25 uniform-guess baseline for four choices; its lower accuracy does not show
+that no other classifier could extract useful information.
 
 \subsection{Exploratory layer sweeps}
 \label{sec:placement}
 
 Table~\ref{tab:placement} summarizes the recorded layer sweeps using the
 highest seed-mean accuracy among the swept layers and the final-layer
-readout from the same source run. Intermediate layers can support useful
-classifiers: for example, the recorded RuleTaker Mistral sweep has a
-selected mean of 0.732 at layer 16 versus 0.682 at the final layer.
-The selected layer varies across models and tasks; several ARC maxima
-occur at the final layer.
+readout from the same source run. The result is not merely that the final
+state is readable: intermediate states often support stronger task readouts.
+For example, the recorded RuleTaker Mistral sweep has a selected mean of
+0.732 at layer 16 versus 0.682 at the final layer. The selected layer varies
+across models and tasks; several ARC maxima occur at the final layer.
 
 Selection uses the same evaluation labels on which accuracy is reported,
 so the selected maxima are optimistic estimates of a layer-selection
@@ -365,11 +368,15 @@ that passage-level shortcuts are absent.
 \label{sec:discussion}
 \label{sec:limits}
 
-The results support training task-specific classifiers on frozen states
-as one classification option. Their relative accuracy against the tested
-scorer is not uniform. More importantly, changing the readout also changes
-the training objective, supervision budget, and prompt. A difference in
-accuracy cannot be attributed solely to access to hidden representations.
+The central result is a regime map, not a universal winner. A task-specific
+classifier on a frozen residual is often competitive with the stored
+closed-set scorer and is substantially better on most of the RuleTaker
+models. Conversely, scoring has its clearest advantage on ARC when the
+residual readout is weak, and that advantage narrows as the readout becomes
+more accurate. The comparison changes both the readout and the training
+objective, supervision budget, and prompt, so these patterns should not be
+read as supervision-independent superiority or as proof that the residual
+alone contains a model belief.
 
 \textbf{Scorer validity.} The product-of-token-probabilities heuristic is
 not standard marginal answer likelihood. Correcting tokenization and
@@ -378,7 +385,7 @@ the stored class predictions cannot quantify that change. All comparative
 claims are conditional on the implemented scorer, not claims about the
 best use of the model's output distribution.
 
-\textbf{Supervision and context.} Headline label budgets are unequal.
+\textbf{Supervision is part of the result.} Headline label budgets are unequal.
 Stored first-$n$ readouts at $n=64$ exist for all 18 headline cells and are
 below the corresponding eight-shot scorer in 17 of 18 cells, including all
 six RuleTaker cells. This is not matched-budget evidence: RuleTaker and ARC
@@ -454,17 +461,20 @@ computation absent from our main comparison.
 
 \section{Conclusion}
 
-Across the evaluated models and datasets, supervised classifiers on frozen
-final-layer states and the implemented few-shot answer-token heuristic
-have different strengths. The full-training readout is numerically higher
-in most RuleTaker cases, whereas eight-shot scoring is higher in all ARC
-cases. Existing BoolQ small-label-budget refits favor the scorer and
-prevent interpreting the full-training results as a supervision-independent
-readout advantage. Exploratory layer and control analyses document
-predictive information accessible to the tested classifiers, not a causal
-account of reasoning. The supported result is this budget- and
-protocol-specific empirical comparison, with the scorer's aggregation
-limitation made explicit.
+Across the evaluated models and datasets, frozen residual readouts and
+closed-set answer-token scoring exhibit structured rather than universal
+differences. Readouts are higher in most RuleTaker cases and remain
+competitive on BoolQ, while scoring has its clearest advantage on ARC models
+whose residual readouts are weak. The ARC gap narrows as readout accuracy
+rises, suggesting that the loop is most useful when the residual does not yet
+provide an easily extractable task decision. Existing small-budget refits
+show that the full-training readout advantage depends partly on task
+supervision and should not be interpreted as supervision-independent
+superiority. Intermediate-layer sweeps further indicate that answer-relevant
+information is often accessible before the final layer, although they do not
+establish early exit. The contribution is a bounded empirical regime map,
+conditional on the stored scorer and evaluated protocols, rather than a claim
+that the loop is unnecessary or that every answer is already in the vector.
 
 \section*{Data availability}
 The experiments use public releases of BoolQ \citep{clark2019boolq},

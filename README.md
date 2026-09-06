@@ -2,21 +2,24 @@
 
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](LICENSE)
 
-**Supervised Residual Readouts versus Few-Shot Answer-Token Scoring**
+**When Is the Vector Enough? Frozen Residual Readouts versus Answer-Token Scoring**
 
-A descriptive comparison of supervised classifiers on frozen final-token
-residual states with zero-/few-shot answer-token scoring across six models
-on BoolQ, RuleTaker, and ARC-Challenge. The methods use different amounts of
-task supervision and different prompt lengths. The stored scorer sums
-log-probabilities of alternative answer tokens, rather than marginalizing
-their probability mass; corrected-baseline performance is unmeasured.
+We map when a supervised classifier on frozen final-token residual states can
+compete with zero-/few-shot answer-token scoring across six models on BoolQ,
+RuleTaker, and ARC-Challenge. Readouts are higher than requested eight-shot
+scoring in 5/6 RuleTaker cases and 2/6 BoolQ cases; scoring is higher in all
+6 ARC cases, with its advantage shrinking as the ARC readout becomes more
+accurate. The methods use different task supervision and prompt lengths. The
+stored scorer sums log-probabilities of alternative answer tokens, rather than
+marginalizing their probability mass; corrected-baseline performance is
+unmeasured.
 
-Against the fixed requested-eight-shot arm, final-layer readout means are
-higher in 5/6 RuleTaker cases, 2/6 BoolQ cases, and 0/6 ARC cases. In the
-existing BoolQ 8/16/32/64-label refits, both refit protocols are below the
-corresponding requested-shot scorer in all 12 model/budget settings. These
-are descriptive comparisons, not significance, equivalence, or
-supervision-matched superiority findings.
+The main result is a regime map, not a universal winner: readouts are often
+strong on rule- and passage-grounded tasks, while scoring is most useful when
+the residual readout is still weak. Existing BoolQ 8/16/32/64-label refits
+show that the full-training readout advantage is not established as
+supervision-independent. These are protocol-specific comparisons, not
+claims about free-form generation, reasoning mechanisms, or early exit.
 
 | Resource | Location |
 |---|---|
@@ -107,7 +110,7 @@ See [`LICENSE`](LICENSE).
 
 ```bibtex
 @misc{herzog2026residualreadout,
-  title={Supervised Residual Readouts versus Few-Shot Answer-Token Scoring},
+  title={When Is the Vector Enough? Frozen Residual Readouts versus Answer-Token Scoring},
   author={Herzog, Hanan},
   year={2026},
   howpublished={GitHub},
