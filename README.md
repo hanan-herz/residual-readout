@@ -39,8 +39,10 @@ python3 -B scripts/build_descriptive_tables.py --check
 ```
 
 Add `--report` to list the 32 explicitly mapped JSON sources and unrounded
-descriptive values. This checks `paper/tables.tex` against stored artifacts;
-it does not rerun experiments or validate their original execution.
+descriptive values, including each placement cell's candidate count and the
+resulting layer-selection noise scale. This checks the six generated table
+files under `paper/` against stored artifacts; it does not rerun experiments
+or validate their original execution.
 
 ### Paper build
 

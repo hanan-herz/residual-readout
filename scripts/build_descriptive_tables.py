@@ -4,6 +4,10 @@
 No fitting, model loading, prediction files, statistical tests, or network I/O.
 Run with --check to verify the committed tables, and --report for source counts
 and unrounded descriptive values. Stored SDs use the producer's ddof=0.
+
+--report also prints a crude layer-selection noise scale (see selection_noise);
+it is arithmetic on stored accuracies for the prose in the placement section,
+not a hypothesis test, and no table cell depends on it.
 """
 from __future__ import annotations
 
@@ -46,10 +50,11 @@ COUNTS = {"boolq": (9427, 3270), "ruletaker": (10000, 4000), "arc": (1000, 1165)
 SHORT_LOOPS = {"boolq_layersweep_mistral7b.json", "boolq_layersweep_granite8b.json"}
 
 CAPTIONS = {
-    "main": r"""\textbf{Fixed final-layer readout and closed-set loop scores}
+    "main": r"""\textbf{Fixed final-layer readout and closed-set scorer accuracies}
 (accuracy). Readout is the stored \texttt{last.mlp} mean $\pm$ seed SD
 (four seeds; SD uses divisor four, not a confidence interval).
-\texttt{loop.zero} and \texttt{loop.8} are zero-shot and requested 8-shot
+\texttt{loop.zero} and \texttt{loop.8} are the stored artifact keys for the
+zero-shot and requested 8-shot scorer arms (\S\ref{sec:scorer}); they are
 accuracies under the manuscript's product-of-token-probabilities heuristic,
 not marginalized answer probabilities or free-form generation.
 $\Delta=$ readout mean $-$ \texttt{loop.8}, with no baseline selection
@@ -68,6 +73,10 @@ final means come from the same sweep JSON; the final column uses that
 sweep file's \texttt{last.mlp}, not a value imported from Table~\ref{tab:main}.
 ARC Qwen3-0.6B has no L27 sweep entry; its final mean is stored separately
 in the same file.
+\emph{Cand.}\ is the number of recorded sweep entries the maximum was taken
+over. It varies from 4 to 10 across cells, and the optimism of a maximum
+grows with it, so the column is needed to read the selected means; see
+\S\ref{sec:placement} for the resulting noise scale.
 These evaluation-selected maxima are optimistic, not held-out gains;
 no significance tests are reported. Sweep train/evaluation counts are
 9427/3270 (BoolQ), 10000/4000 (RuleTaker), and 1000/1165 (ARC-Challenge).
@@ -97,6 +106,24 @@ identical labeled examples. The declared training pool has 9427 rows;
 readout and loop evaluation counts are both 3270. Readout/loop token caps
 are 384/8192. No significance tests are reported.""",
 }
+
+
+# Expected maximum of L independent standard normals, L = 4..10 (Monte-Carlo,
+# rounded). Used only to print a descriptive scale for how far the maximum of L
+# noisy layer estimates sits above a single one; it is not a hypothesis test.
+EMAX = {4: 1.029, 5: 1.163, 6: 1.267, 7: 1.352, 8: 1.423, 9: 1.485, 10: 1.539}
+
+
+def selection_noise(accuracy, n_eval, n_candidates):
+    """Scale of the upward bias in a maximum over ``n_candidates`` layer means.
+
+    Binomial standard error at the observed accuracy times the expected maximum
+    of that many independent standard normals. Deliberately crude: layer
+    readouts are positively correlated across depth, which shrinks the real
+    inflation, so this over-states it and is a conservative yardstick.
+    """
+    se = math.sqrt(accuracy * (1 - accuracy) / n_eval)
+    return EMAX[n_candidates] * se
 
 
 def table(label, columns, header, rows):
@@ -136,6 +163,7 @@ def main():
 
     rows = {label: [] for label in CAPTIONS}
     deltas = {}
+    placement = {}
     previous = None
     for task, model, readout_file, loop_file, sweep_file in CELLS:
         d, loop, sweep = (sources[name] for name in
@@ -175,7 +203,7 @@ def main():
         ])
         rows["placement"].extend([
             f"% Sweep: {sweep_file}",
-            prefix + f"L{best} & {selected:.3f} & L{final} & {final_mean:.3f}" + r" \\",
+            prefix + f"{len(layers)} & L{best} & {selected:.3f} & L{final} & {final_mean:.3f}" + r" \\",
         ])
         rows["controls"].extend([
             f"% Readout: {readout_file}",
@@ -186,8 +214,13 @@ def main():
         previous = task
         if args.report:
             print(f"MAIN {task} {model}: mean={mean!r}, sd={sd!r}, zero={zero!r}, eight={eight!r}, delta={delta!r}")
-            print(f"PLACEMENT {task} {model}: L{best}={selected!r}, L{final}={final_mean!r}, headline_final_difference={final_mean - mean!r}")
+            print(f"PLACEMENT {task} {model}: cand={len(layers)}, L{best}={selected!r}, L{final}={final_mean!r}, "
+                  f"gap_pp={100 * (selected - final_mean):.2f}, "
+                  f"selection_noise_pp={100 * selection_noise(selected, sweep["meta"]["n_val"], len(layers)):.2f}, "
+                  f"headline_final_difference={final_mean - mean!r}")
             print(f"CONTROLS {task} {model}: {controls!r}")
+        placement.setdefault(task, []).append(
+            (selected - final_mean, selection_noise(selected, sweep["meta"]["n_val"], len(layers)), len(layers)))
 
     for model, name in BUDGET:
         d = sources[name]
@@ -209,10 +242,12 @@ def main():
             if args.report:
                 print(f"BUDGET {model} k={k}: first={first!r}, balanced={balanced!r}, loop={loop!r}")
 
-    preamble = r"""% Generated by python3 scripts/build_descriptive_tables.py; do not edit numbers.
-% Sources are explicit local results/*.json mappings in that stdlib-only script.
-% Requires booktabs and graphicx. Shared by the paper and standalone wrapper.
-\newcommand{\fittable}[1]{%
+    header = ("% Generated by python3 scripts/build_descriptive_tables.py; do not edit numbers.\n"
+              "% Sources are explicit local results/*.json mappings in that stdlib-only script.\n")
+    # \fittable lives in its own file because the manuscript inputs the four
+    # per-table files separately; \providecommand keeps a double input harmless.
+    macros = header + r"""% Requires booktabs and graphicx. Input once before any table file.
+\providecommand{\fittable}[1]{%
   \sbox0{#1}%
   \ifdim\wd0>\textwidth
     \resizebox{\textwidth}{!}{\usebox0}%
@@ -220,24 +255,43 @@ def main():
     \usebox0
   \fi
 }
-
 """
-    text = preamble + "\n".join([
-        table("main", "llcccc", r"Task & Model & Readout mean $\pm$ SD & \texttt{loop.zero} & \texttt{loop.8} & $\Delta$ vs.\ 8-shot", rows["main"]),
-        table("placement", "llcccc", "Task & Model & Selected layer & Selected mean & Final layer & Final mean", rows["placement"]),
-        table("controls", "llccccccc", "Task & Model & Shuffle & RP max & RP d & RP perm & RP noise & Context & Final", rows["controls"]),
-        table("budget", "lcccc", r"Model & $n=k$ & First-$n$ refit & Class-balanced refit & \texttt{loop.k}", rows["budget"]),
-    ])
+    preamble = header + "% Shared by the paper and the standalone wrapper.\n\\input{tables_macros.tex}\n\n"
+    built = {
+        "main": table("main", "llcccc", r"Task & Model & Readout mean $\pm$ SD & \texttt{loop.zero} & \texttt{loop.8} & $\Delta$ vs.\ 8-shot", rows["main"]),
+        "placement": table("placement", "llccccc", "Task & Model & Cand. & Selected layer & Selected mean & Final layer & Final mean", rows["placement"]),
+        "controls": table("controls", "llccccccc", "Task & Model & Shuffle & RP max & RP d & RP perm & RP noise & Context & Final", rows["controls"]),
+        "budget": table("budget", "lcccc", r"Model & $n=k$ & First-$n$ refit & Class-balanced refit & \texttt{loop.k}", rows["budget"]),
+    }
+    # tables.tex keeps all four for the standalone main_tables.tex wrapper. The
+    # manuscript inputs the per-table files instead, so each wide float is
+    # declared next to the text that discusses it; declaring all four up front
+    # fills the float queue and pushes every figure past its own reference.
+    text = preamble + "\n".join(built.values())
+    outputs = {args.out: text, args.out.with_name("tables_macros.tex"): macros}
+    for label, body in built.items():
+        outputs[args.out.with_name(f"table_{label}.tex")] = header + body
     if args.report:
         for task, values in deltas.items():
             print(f"SUMMARY {task}: {sum(v > 0 for v in values)}/{len(values)} positive deltas vs loop.8; range={min(values):+.6f}..{max(values):+.6f}")
+        for task, values in placement.items():
+            scales = [100 * noise for _, noise, _ in values]
+            print(f"PLACEMENT-SUMMARY {task}: cand={sorted({c for *_, c in values})}, "
+                  f"noise scale {min(scales):.1f}-{max(scales):.1f}pp, "
+                  f"{sum(gap > noise for gap, noise, _ in values)}/{len(values)} gaps exceed it")
+        flat = [v for values in placement.values() for v in values]
+        scales = [100 * noise for _, noise, _ in flat]
+        print(f"PLACEMENT-SUMMARY total: noise scale {min(scales):.1f}-{max(scales):.1f}pp, "
+              f"{sum(gap > noise for gap, noise, _ in flat)}/{len(flat)} gaps exceed it")
     if args.check:
-        if args.out.read_text() != text:
-            raise SystemExit(f"STALE: {args.out}; run this script without --check")
-        print(f"OK: {args.out} matches {len(sources)} validated JSON sources")
+        for path, body in outputs.items():
+            if not path.exists() or path.read_text() != body:
+                raise SystemExit(f"STALE: {path}; run this script without --check")
+        print(f"OK: {len(outputs)} table files match {len(sources)} validated JSON sources")
     else:
-        args.out.write_text(text)
-        print(f"Wrote {args.out} from {len(sources)} validated JSON sources")
+        for path, body in outputs.items():
+            path.write_text(body)
+        print(f"Wrote {len(outputs)} table files from {len(sources)} validated JSON sources")
 
 
 if __name__ == "__main__":

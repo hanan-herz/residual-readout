@@ -21,17 +21,21 @@ classifier on final-token residual states with zero-/few-shot closed-set
 answer-token scoring across six open-weight models on BoolQ, RuleTaker, and
 ARC-Challenge. The methods use the same frozen backbone but different task
 supervision and prompt lengths. Their relative performance is structured
-rather than universal: the final-layer readout is higher than requested
-eight-shot scoring in five of six RuleTaker cases and two of six BoolQ cases,
-whereas scoring is higher in all six ARC cases. On ARC, the scorer's advantage
-falls from 10.6 points for Qwen3-0.6B to 0.4 points for Qwen3-8B as the
-readout becomes more predictive.
+rather than universal: the final-layer readout is numerically higher than
+requested eight-shot scoring in five of six RuleTaker cases and two of six
+BoolQ cases, whereas scoring is higher in all six ARC cases. On ARC the
+scorer's advantage is ordered by readout competence across all six models,
+falling from 10.6 points where the readout is weakest to under one point for
+the two strongest readouts.
 
-Existing BoolQ small-budget refits qualify the result: the full-training
-readout advantage is not established as supervision-independent. Intermediate
+Existing small-budget refits qualify the result. Stored 64-label readouts
+fall below the eight-shot scorer in 17 of 18 cells, and BoolQ
+class-balanced refits do not preserve the full-training readout's advantage,
+so that advantage is not established as supervision-independent. Intermediate
 layer sweeps show that answer-relevant information is often accessible before
-the final layer, although evaluation-selected maxima do not establish held-out
-gains or early exit. The scorer is the stored product-of-token-probabilities
+the final layer: in 12 of 18 cells the best swept layer exceeds the final one
+by more than a crude selection-noise scale, although evaluation-selected
+maxima still do not establish held-out gains or early exit. The scorer is the stored product-of-token-probabilities
 heuristic, not marginalized answer likelihood or free-form generation. The
 contribution is therefore a protocol-specific regime map: readouts are often
 competitive on rule- and passage-grounded tasks, while scoring is most useful
@@ -62,21 +66,27 @@ separate, together with a supervision-budget qualification and layerwise
 readouts. This is not a supervision-matched superiority result or a test of
 generated iterative reasoning. The main observations are:
 \begin{enumerate}
-\item \textbf{The loop's value is regime-dependent.} The final-layer
+\item \textbf{Scoring's value is regime-dependent.} The final-layer
 classifier is numerically higher than the fixed eight-shot scorer in five
 RuleTaker cases and two BoolQ cases, while the scorer is higher in all six
-ARC cases. The largest scorer gaps occur where the readout is weakest, and
-the ARC gap narrows as readout accuracy rises (Table~\ref{tab:main}).
-\item \textbf{Supervision changes the comparison.} In the existing BoolQ
-refits, matching the number of classifier training labels to the requested
-number of demonstrations does not preserve the full-training classifier's
-advantage (Table~\ref{tab:budget}). These artifacts match declared counts,
-not independently verified example identities or retained prompt counts.
+ARC cases. The largest scorer gaps occur where the readout is weakest: across
+all six ARC models the gap falls monotonically with readout accuracy, apart
+from a 0.4-point inversion between the two strongest readouts
+(Table~\ref{tab:main}).
+\item \textbf{Supervision changes the comparison.} Stored 64-label readouts
+exist for all 18 cells and fall below the corresponding eight-shot scorer in
+17 of them, including all six RuleTaker cells. On BoolQ, where matched
+requested-shot arms exist, matching the number of classifier training labels
+to the requested number of demonstrations does not preserve the
+full-training classifier's advantage (Table~\ref{tab:budget}). These
+artifacts match declared counts, not independently verified example
+identities or retained prompt counts.
 \item \textbf{Answer-relevant information is often accessible before the
 final layer.} Several intermediate layers support higher readout accuracy
-than the final layer. These evaluation-selected maxima do not establish
-held-out gains from layer selection or justify stopping the backbone early
-(Table~\ref{tab:placement}).
+than the final layer, and in 12 of 18 cells by more than the scale of the
+optimism that picking a maximum introduces. These evaluation-selected maxima
+still do not establish held-out gains from layer selection or justify
+stopping the backbone early (Table~\ref{tab:placement}).
 \end{enumerate}
 
 The interpretation is further limited by the implemented scoring heuristic:
@@ -93,7 +103,12 @@ Let $h_T\in\mathbb{R}^d$ denote the last nonpadding token's output from
 the final transformer block of a frozen model, before subsequent model-level
 normalization or output processing. For DeepSeek, grouped trailing output
 dimensions are flattened into a feature vector, giving an effective input
-width of 16384 (the other model widths range from 1024 to 4096). The prompt includes the
+width of 16384 (the other model widths range from 1024 to 4096). The readout
+capacity is therefore not constant across models: at a fixed hidden width the
+first layer holds 16 times as many parameters for DeepSeek as for
+Qwen3-0.6B. DeepSeek has the highest readout accuracy on BoolQ and ARC, and
+this asymmetry is a candidate explanation that the present runs do not
+separate from backbone quality. The prompt includes the
 question and, where supplied by the task, the passage. Gold answers are not
 appended to the readout's input. Prompts are left-truncated to 384 tokens,
 retaining the prompt suffix and trailing answer slot, but not necessarily
@@ -115,9 +130,17 @@ or projection dimension on evaluation accuracy is exploratory.
 The baseline processes a task prompt with zero or $k$ balanced demonstrations
 from the training split. Demonstrations are selected in class round-robin
 order from the shuffled training rows; selection is not averaged over
-different exemplar sets or orders. Both methods choose from the same closed
+different exemplar sets or orders. The round-robin is deterministic and
+cycles the classes in a fixed order, so for the binary tasks at even $k$ the
+demonstration immediately preceding the query always carries the same label.
+Few-shot predictions are known to be sensitive to exactly this kind of
+exemplar order and label balance \citep{zhao2021calibrate}, and the stored
+runs do not vary either. Both methods choose from the same closed
 answer set: Yes/No for BoolQ and RuleTaker, and A--D for ARC. The baseline
-does not generate intermediate reasoning or a free-form answer.
+does not generate intermediate reasoning or a free-form answer. The stored
+artifacts and table columns name these arms \texttt{loop.zero} and
+\texttt{loop.$k$} for historical reasons; we call them scorer arms
+throughout.
 
 For each answer class $c$, the implementation constructs a token-ID set
 $S_c$ from bare and space-prefixed answer variants tokenized after
@@ -142,11 +165,22 @@ no suffix IDs under the implemented slicing rule. Consequently, even where
 sum and marginalization coincide for the retained singleton, the procedure
 does not establish coverage of all intended answer variants.
 
-All reported loop accuracies use this existing heuristic. Its numerical
+All reported scorer accuracies use this existing heuristic. Its numerical
 difference from a corrected scorer is unmeasured. The pipeline saves
 aggregate accuracies and, on fresh runs, class predictions rather than the
 token probabilities needed to rescore offline. These results should not be
 read as comparisons against standard answer-likelihood scoring generally.
+The corrections we do not apply are well studied: raw answer-token
+probability is confounded by surface form and benefits from
+probability-ratio scoring \citep{holtzman2021surface}, closed-set prompted
+predictions benefit from contextual calibration \citep{zhao2021calibrate},
+and multiple-choice evaluation is conventionally length- or
+unconditional-probability-normalized \citep{brown2020gpt3}. Token-level
+decision rules of the kind implemented here are also known to be suboptimal
+relative to hidden-state criteria on the same frozen model
+\citep{cho2025hidden}, which is independent evidence that our scorer is a
+weak rather than a strong output baseline, and hence that the readout-favorable
+cells below are the ones to treat with most caution.
 
 \subsection{Supervision, context, and reporting}
 
@@ -197,7 +231,11 @@ training rows and 1165 test rows. The reported 1000-row training set is a
 seed-0 subsample. No retrieval corpus is supplied for ARC, but the question
 and choices themselves remain part of the input.
 
-\input{tables.tex}
+% Wide floats are declared next to the text that discusses them: four table*
+% environments plus three full-width figures compete for a body of about ten
+% pages, so declaring them in one block strands whichever group comes second.
+\input{tables_macros.tex}
+\input{table_main.tex}
 
 \section{Results}
 
@@ -208,14 +246,19 @@ separate scorer arms reported in Table~\ref{tab:main}.
 \centering
 \includegraphics[width=\textwidth]{figures/descriptive_main.pdf}
 \caption{\textbf{Cross-model accuracy under different supervision protocols.}
-Readout points are final-layer four-seed means; bars show seed SD, not
-confidence intervals. Scorer points retain both zero-shot and requested
-eight-shot arms of the implemented token-probability heuristic.
+Readout points are final-layer four-seed means. Seed SD spans 0.11 to 0.71
+accuracy points across the 18 cells, which is shorter than the plotted
+markers, so it is stated here rather than drawn; it is training-seed spread
+on a fixed evaluation set, not a confidence interval. Scorer points retain
+both zero-shot and requested eight-shot arms of the implemented
+token-probability heuristic.
 Readouts use 9427 BoolQ, 10000 RuleTaker, or 1000 ARC training labels;
 scorers do not fit task-specific weights. Prompt lengths and token caps
 differ (Table~\ref{tab:main}). No significance tests are shown.}
 \label{fig:descriptive-main}
 \end{figure}
+
+\input{table_budget.tex}
 
 \subsection{BoolQ: full-training and small-budget readouts}
 \label{sec:boolq}
@@ -264,7 +307,9 @@ requested-shot curves and the full-training readout reference.
 \includegraphics[width=\textwidth]{figures/descriptive_budget.pdf}
 \caption{\textbf{BoolQ supervision-budget descriptions.}
 At $n=k\in\{8,16,32,64\}$, readout curves show first-$n$ and class-balanced
-refit means with seed SD; scorer curves show requested-$k$-shot accuracy.
+refit means; scorer curves show requested-$k$-shot accuracy. Refit seed SD
+spans 0.06 to 0.35 accuracy points and is stated rather than drawn, for the
+reason given in Figure~\ref{fig:descriptive-main}.
 Dashed lines mark the 9427-label readout mean, not a matched-budget arm.
 Equal counts do not certify identical examples or retained demonstrations;
 readout/scorer token caps are 384/8192. Lines connect recorded settings,
@@ -295,10 +340,16 @@ experiment isolating question-level deduction depth, nor infer a serial
 reasoning threshold from them.
 
 On ARC, the eight-shot scorer is numerically higher in all six cases. This is
-the clearest scorer-favorable regime, but its size is organized by readout
-competence: the gap is about 10.6 points for Qwen3-0.6B, 4.1 points for
-Qwen3-4B, and 0.4 points for Qwen3-8B. Granite remains an exception at an
-8.2-point gap despite a stronger model, while DeepSeek is nearly even. The
+the clearest scorer-favorable regime, and its size is ordered by readout
+competence across the whole model set rather than within one family. Sorting
+the six cells by readout accuracy gives gaps of 10.6 points (Qwen3-0.6B,
+readout 0.492), 8.2 (Granite-3.1-8B, 0.708), 5.1 (Mistral-7B, 0.728), 4.1
+(Qwen3-4B, 0.841), 0.4 (Qwen3-8B, 0.909), and 0.8 (DeepSeek-V4-Flash,
+0.951): monotone in four of five steps, with the only inversion a 0.4-point
+difference between the two strongest readouts. Granite is the clearest case
+that the ordering tracks readout accuracy and not parameter count, since its
+8.2-point gap accompanies the second-weakest readout in an eight-billion
+parameter model. The
 pattern is an empirical association, not a causal size law: readout accuracy
 and readout-minus-scorer share a term mathematically, and the readout has only
 1000 training labels here versus 9427 on BoolQ and 10000 on RuleTaker. The
@@ -307,6 +358,8 @@ and readout-minus-scorer share a term mathematically, and the readout has only
 about the endpoint. Qwen3-0.6B's readout accuracy of 0.492 is well above the
 0.25 uniform-guess baseline for four choices; its lower accuracy does not show
 that no other classifier could extract useful information.
+
+\input{table_placement.tex}
 
 \subsection{Exploratory layer sweeps}
 \label{sec:placement}
@@ -319,13 +372,34 @@ For example, the recorded RuleTaker Mistral sweep has a selected mean of
 0.732 at layer 16 versus 0.682 at the final layer. The selected layer varies
 across models and tasks; several ARC maxima occur at the final layer.
 
-Selection uses the same evaluation labels on which accuracy is reported,
-so the selected maxima are optimistic estimates of a layer-selection
-procedure's generalization. A paired test at the selected layer, followed
-only by correction across the 18 cells, would not account for the
-within-cell layer search. We therefore report neither selection-unadjusted
-significance nor a claim that intermediate layers never lose. These sweeps
-describe predictive readouts, not the behavior of a backbone stopped early.
+Selection uses the same evaluation labels on which accuracy is reported, so
+the selected maxima are optimistic estimates of a layer-selection procedure's
+generalization. The optimism has a magnitude a reader can check. Taking the
+binomial standard error at the observed accuracy on each evaluation set and
+multiplying by the expected maximum of as many independent standard normals
+as there are swept candidates gives a scale of 0.7 to 2.1 accuracy points,
+varying with evaluation size and with the 4 to 10 candidates per cell
+(Table~\ref{tab:placement}). Twelve of the 18 selected-minus-final gaps
+exceed that scale, including all six RuleTaker cells and five of six BoolQ
+cells but only one of six on ARC, where the evaluation set is smallest. This
+yardstick is deliberately crude and, if anything, too strict: layer readouts
+are positively correlated across depth, which shrinks the real inflation
+below the independent-candidate figure. It is arithmetic on the stored
+accuracies, not a hypothesis test, and it is reproduced by
+\texttt{--report} in the table generator.
+
+The gaps that clear the scale are therefore harder to explain as selection
+artifacts alone; the six that do not are BoolQ DeepSeek and every ARC cell
+except Qwen3-4B, three of which are exactly zero because the maximum falls at
+the final layer. Clearing the scale is not a significance claim: it bounds
+the optimism from picking a maximum, not the evaluation-sampling uncertainty
+of the underlying difference, and the reported means average four training
+seeds rather than one draw. A paired test
+at the selected layer, followed only by correction across the 18 cells, would
+still not account for the within-cell layer search, so we report no
+selection-unadjusted significance and make no claim that intermediate layers
+never lose. These sweeps describe predictive readouts, not the behavior of a
+backbone stopped early.
 
 Figure~\ref{fig:descriptive-layers} displays all recorded MLP sweep points
 rather than highlighting evaluation-selected maxima.
@@ -334,14 +408,18 @@ rather than highlighting evaluation-selected maxima.
 \centering
 \includegraphics[width=\textwidth]{figures/descriptive_layers.pdf}
 \caption{\textbf{Exploratory layer sweeps.}
-Curves connect recorded MLP seed means; bands show $\pm$ seed SD, not
-confidence intervals. Diamonds mark the final-layer readout from the same
-sweep JSON, including the separately stored ARC Qwen3-0.6B final L27.
+Curves connect recorded MLP seed means; bands show $\pm$ seed SD (0.07 to
+1.17 accuracy points), not confidence intervals. Diamonds mark the
+final-layer readout from the same sweep JSON, including the separately stored
+ARC Qwen3-0.6B final L27; their seed SD is not drawn, for the reason given in
+Figure~\ref{fig:descriptive-main}.
 Sources match Table~\ref{tab:placement}, not necessarily the headline runs.
 Layer indices are zero-based. No winning layer or significance is marked;
 evaluation-selected maxima are not held-out gains.}
 \label{fig:descriptive-layers}
 \end{figure}
+
+\input{table_controls.tex}
 
 \subsection{Control readouts}
 
@@ -350,8 +428,16 @@ and mean-pooled-context results. Context pooling averages all retained
 nonpadding prompt tokens, not just passage tokens. Shuffling training labels generally
 reduces predictive accuracy, but this is not a dataset-overlap audit and
 does not rule out leakage. On imbalanced datasets, uniform guessing and
-majority-class prediction have different expected accuracies; the BoolQ
-validation majority is 0.6217.
+majority-class prediction have different expected accuracies, so the
+constant-predictor rate is the reference these controls should be read
+against: it is 0.6217 on the BoolQ validation split, 0.5035 on the RuleTaker
+evaluation subset, and 0.2652 on the ARC evaluation split, the last against a
+0.25 uniform rate. Against those references the BoolQ shuffle controls
+(0.522--0.542) fall well below a constant predictor, whereas five of the six
+ARC shuffle controls sit slightly above 0.2652. Table~\ref{tab:budget}
+should be read the same way: the Qwen3-0.6B refits span 0.594 to 0.660,
+straddling the BoolQ constant-predictor rate, so the smallest-budget readouts
+there are near or below trivial rather than merely weak.
 
 Gaussian projections retain substantial predictive accuracy at the tested
 dimensions (64 or 256, reported per row in Table~\ref{tab:controls}). The
@@ -388,7 +474,11 @@ best use of the model's output distribution.
 \textbf{Supervision is part of the result.} Headline label budgets are unequal.
 Stored first-$n$ readouts at $n=64$ exist for all 18 headline cells and are
 below the corresponding eight-shot scorer in 17 of 18 cells, including all
-six RuleTaker cells. This is not matched-budget evidence: RuleTaker and ARC
+six RuleTaker cells. The sole exception is BoolQ Qwen3-0.6B, at 0.657 against
+0.645 -- the same cell that carries the largest readout-favorable BoolQ
+margin at full training, so the one budget-restricted survivor is also the
+one case the headline comparison most favors. This is not matched-budget
+evidence: RuleTaker and ARC
 have no 64-shot scorer arm, and these stored refits are first-$n$, not
 class-balanced. The BoolQ class-balanced refits provide a complementary
 qualification for three models on one dataset, with incomplete subset
@@ -417,8 +507,12 @@ comparison to fine-tuned specialists under matched resources.
 descriptive tables from stored JSONs. Sweep and headline entries are
 distinct in the source mapping only where separate files are used; some
 entries share a file or cached computation, so the tables do not provide a
-run-to-run variability estimate. Local
-full-size paired loop/readout predictions are incomplete for BoolQ
+run-to-run variability estimate. Where the same quantity was stored twice by
+different runs it does not always agree: the BoolQ Qwen3-0.6B first-$n$
+readout at $n=64$ is 0.657 in the headline file and 0.660 in the label-budget
+file. Both readings support the statements that use them, and the difference
+indicates the scale of run-to-run drift rather than an error in either. Local
+full-size paired scorer/readout predictions are incomplete for BoolQ
 Qwen3-0.6B, Qwen3-8B, and DeepSeek; scalar results exist for all 18 cells.
 Persisted best-seed heads, seed means, and separately fitted vote ensembles
 are different objects and should not be substituted for one another.
@@ -434,6 +528,19 @@ yes/no predictions for ESG concept measurement. Our study adds a
 cross-model, three-dataset comparison under the particular protocols
 described here, not a new claim that supervised probes can predict task
 labels.
+
+\textbf{Scoring closed answer sets.} How a frozen model's output
+distribution is turned into a closed-set decision is itself a literature.
+Raw answer-token probability is confounded by surface form, motivating
+probability-ratio scoring \citep{holtzman2021surface}; few-shot prompted
+predictions are sensitive to exemplar choice and order and improve under
+contextual calibration \citep{zhao2021calibrate}; multiple-choice evaluation
+conventionally normalizes by length or unconditional probability
+\citep{brown2020gpt3}; and calibration itself varies with depth
+\citep{joshi2025calibration}. The scorer implemented here applies none of
+these corrections (\S\ref{sec:scorer}), which places our baseline below the
+standard of that work and is the main reason our comparative claims are
+conditional rather than general.
 
 \textbf{Beliefs and correctness.} CCS \citep{burns2022ccs} studies
 unsupervised recovery of truth-related directions; other work examines
@@ -465,16 +572,18 @@ Across the evaluated models and datasets, frozen residual readouts and
 closed-set answer-token scoring exhibit structured rather than universal
 differences. Readouts are higher in most RuleTaker cases and remain
 competitive on BoolQ, while scoring has its clearest advantage on ARC models
-whose residual readouts are weak. The ARC gap narrows as readout accuracy
-rises, suggesting that the loop is most useful when the residual does not yet
-provide an easily extractable task decision. Existing small-budget refits
-show that the full-training readout advantage depends partly on task
-supervision and should not be interpreted as supervision-independent
-superiority. Intermediate-layer sweeps further indicate that answer-relevant
-information is often accessible before the final layer, although they do not
-establish early exit. The contribution is a bounded empirical regime map,
-conditional on the stored scorer and evaluated protocols, rather than a claim
-that the loop is unnecessary or that every answer is already in the vector.
+whose residual readouts are weak. Across all six ARC models the gap falls
+with readout accuracy, suggesting that scoring is most useful when the
+residual does not yet provide an easily extractable task decision. Existing
+small-budget refits show that the full-training readout advantage depends
+partly on task supervision and should not be interpreted as
+supervision-independent superiority. Intermediate-layer sweeps further
+indicate that answer-relevant information is often accessible before the
+final layer, by margins that in two thirds of cells exceed the optimism of
+selecting a maximum, although they do not establish early exit. The
+contribution is a bounded empirical regime map, conditional on the stored
+scorer and evaluated protocols, rather than a claim that scoring is
+unnecessary or that every answer is already in the vector.
 
 \section*{Data availability}
 The experiments use public releases of BoolQ \citep{clark2019boolq},

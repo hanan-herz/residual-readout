@@ -40,15 +40,19 @@ def main():
         plt.close(fig)
         print(f"Wrote {path}")
 
+    # Seed SDs here are 0.1-0.7 accuracy points: an error bar for them is
+    # shorter than the marker that hides it, so plotting one promises an
+    # encoding the figure cannot render. Report the bound in the caption
+    # instead -- see the SEED-SD line printed below.
     fig, axes = plt.subplots(1, 3, figsize=(8.4, 4.1), sharey=True)
+    readout_sds = []
     for ax, task in zip(axes, tasks):
         for i, (_, model, readout, loop, _) in enumerate(c for c in CELLS if c[0] == task):
             d, scorer = sources[readout], sources[loop or readout]
             mean, sd = d["last.mlp"]
             assert 40 <= 100 * (mean - sd) <= 100 * (mean + sd) <= 100, (task, model)
             assert all(40 <= 100 * scorer[key] <= 100 for key in ("loop.zero", "loop.8")), (task, model)
-            ax.errorbar(100 * mean, i - 0.2, xerr=100 * sd, fmt="none", color=blue,
-                        capsize=2, zorder=3)
+            readout_sds.append(sd)
             ax.plot(100 * mean, i - 0.2, "o", color=blue, markersize=4, zorder=4)
             ax.plot(100 * scorer["loop.zero"], i, "s", color=orange, markersize=4)
             ax.plot(100 * scorer["loop.8"], i + 0.2, "^", color=green, markersize=5)
@@ -58,15 +62,19 @@ def main():
     axes[0].set_yticklabels(models)
     axes[0].invert_yaxis()
     handles = [Line2D([], [], color=color, marker=marker, linestyle="none", label=label)
-               for color, marker, label in [(blue, "o", "Final readout (mean +/- SD)"),
+               for color, marker, label in [(blue, "o", "Final readout (four-seed mean)"),
                                             (orange, "s", "Zero-shot scorer"),
                                             (green, "^", "Requested 8-shot scorer")]]
     fig.legend(handles=handles, loc="lower center", ncol=3, frameon=False, fontsize=9)
     fig.tight_layout(rect=(0, 0.10, 1, 1))
     save(fig, "main")
+    print(f"SEED-SD main: readout seed SD {100 * min(readout_sds):.2f}-"
+          f"{100 * max(readout_sds):.2f}pp (not plotted; smaller than the markers)")
 
+    # Same reasoning as Figure 1: these refit SDs are 0.1-0.4 accuracy points.
     fig, axes = plt.subplots(1, 3, figsize=(8.4, 3.7), sharey=True)
     ks = (8, 16, 32, 64)
+    refit_sds = []
     for ax, (model, name) in zip(axes, BUDGET):
         d = sources[name]
         for field, color, marker, label in [("budget", blue, "o", "First-n refit"),
@@ -74,8 +82,9 @@ def main():
             means, sds = zip(*(d[field][str(k)] for k in ks))
             assert all(40 <= 100 * (m - s) <= 100 * (m + s) <= 95
                        for m, s in zip(means, sds)), (model, field)
-            ax.errorbar(ks, [100 * m for m in means], yerr=[100 * s for s in sds],
-                        color=color, marker=marker, markersize=4, capsize=2, label=label)
+            refit_sds.extend(sds)
+            ax.plot(ks, [100 * m for m in means], color=color, marker=marker,
+                    markersize=4, label=label)
         assert all(40 <= 100 * d[f"loop.{k}"] <= 95 for k in ks), model
         assert 40 <= 100 * d["last.mlp"][0] <= 95, model
         ax.plot(ks, [100 * d[f"loop.{k}"] for k in ks], color=orange, marker="^",
@@ -90,8 +99,14 @@ def main():
     fig.legend(handles, legend_labels, loc="lower center", ncol=2, frameon=False, fontsize=9)
     fig.tight_layout(rect=(0, 0.16, 1, 1))
     save(fig, "budget")
+    print(f"SEED-SD budget: refit seed SD {100 * min(refit_sds):.2f}-"
+          f"{100 * max(refit_sds):.2f}pp (not plotted; smaller than the markers)")
 
+    # The swept-curve bands DO render here (7-10 points wide, alpha 0.18), so
+    # unlike Figures 1-2 this figure keeps its SD encoding. The final-layer
+    # diamond gets no error bar: a single point's SD would be occluded again.
     fig, axes = plt.subplots(6, 3, figsize=(8.4, 9.4), sharey=True)
+    sweep_sds = []
     for task, model, _, _, sweep in CELLS:
         ax = axes[models.index(model), tasks.index(task)]
         d = sources[sweep]
@@ -100,14 +115,13 @@ def main():
         assert all(20 <= 100 * (m - s) <= 100 * (m + s) <= 100
                    for m, s in zip(means, sds)), (task, model)
         xs = [int(layer) for layer in layers]
+        sweep_sds.extend(sds)
         ax.plot(xs, [100 * m for m in means], color=blue, marker="o", markersize=3)
         ax.fill_between(xs, [100 * (m - s) for m, s in zip(means, sds)],
                         [100 * (m + s) for m, s in zip(means, sds)], color=blue, alpha=0.18)
         final = d["meta"]["n_layers"] - 1
         mean, sd = d["last.mlp"]
         assert 20 <= 100 * (mean - sd) <= 100 * (mean + sd) <= 100, (task, model)
-        ax.errorbar(final, 100 * mean, yerr=100 * sd, fmt="none", color=orange,
-                    capsize=2, zorder=3)
         ax.plot(final, 100 * mean, "D", color=orange, markersize=4, zorder=4)
         ax.set(ylim=(20, 100), yticks=[20, 40, 60, 80, 100], xticks=[xs[0], final // 2, final])
         if task == "BoolQ":
@@ -116,12 +130,14 @@ def main():
             ax.set_title(labels[task])
         if model == models[-1]:
             ax.set_xlabel("Layer (zero-based)")
-    fig.legend(handles=[Line2D([], [], color=blue, marker="o", label="Swept MLP mean; band = +/- seed SD"),
+    fig.legend(handles=[Line2D([], [], color=blue, marker="o", label="Swept MLP mean; band = ± seed SD"),
                         Line2D([], [], color=orange, marker="D", linestyle="none",
                                label="Final layer, same source run")],
                loc="lower center", ncol=2, frameon=False, fontsize=9)
     fig.tight_layout(rect=(0, 0.045, 1, 1), h_pad=0.7)
     save(fig, "layers")
+    print(f"SEED-SD layers: swept seed SD {100 * min(sweep_sds):.2f}-"
+          f"{100 * max(sweep_sds):.2f}pp (plotted as bands)")
 
 
 if __name__ == "__main__":

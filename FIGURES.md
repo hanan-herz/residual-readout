@@ -13,15 +13,24 @@ fitting, or significance testing is performed by these builders.
 | `paper/figures/descriptive_main.pdf` | Final-layer readout means and seed SDs, with separate zero-shot and requested-eight-shot scorer arms | `scripts/build_descriptive_figures.py` |
 | `paper/figures/descriptive_budget.pdf` | BoolQ first-n and balanced refits, requested-shot scores, and full-training reference | `scripts/build_descriptive_figures.py` |
 | `paper/figures/descriptive_layers.pdf` | Recorded MLP layer sweeps and final-layer readouts from the same sweep sources | `scripts/build_descriptive_figures.py` |
-| `paper/tables.tex` | Main comparison, placement sweeps, controls, and BoolQ label budgets | `scripts/build_descriptive_tables.py` |
+| `paper/tables.tex` | All four tables in one file, for the standalone wrapper | `scripts/build_descriptive_tables.py` |
+| `paper/table_{main,budget,placement,controls}.tex` | One table each; the manuscript inputs these so every wide float is declared beside the text that discusses it | `scripts/build_descriptive_tables.py` |
+| `paper/tables_macros.tex` | `\fittable` definition, input once before any table file | `scripts/build_descriptive_tables.py` |
 | `paper/main_tables.tex` | Standalone wrapper for `tables.tex` | LuaLaTeX, run from `paper/` |
 | `paper/paper.pdf` | Public manuscript, including the current figures and tables | `bash paper/build.sh` |
 
+All six generated table files come from one run of the builder and are checked
+together; `--check` fails if any of them drifts from the stored JSONs.
+
 The source mapping uses full-evaluation loop reruns for BoolQ Mistral and
 Granite, separate RuleTaker 10k/4k placement sweeps, and the three BoolQ
-`samek` files for label-budget refits. Source comments in `paper/tables.tex`
-identify each row's inputs. Seed SD is not a confidence interval;
-evaluation-selected layer maxima are exploratory, not held-out gains.
+`samek` files for label-budget refits. Source comments in the generated table
+files identify each row's inputs. Seed SD is not a confidence interval, and in
+Figures 1 and 2 it is stated in the caption rather than drawn, because at
+0.06--0.71 accuracy points an error bar would be shorter than its own marker.
+Evaluation-selected layer maxima are exploratory, not held-out gains; the
+placement table reports how many candidates each maximum was taken over, and
+`--report` prints the corresponding selection-noise scale.
 
 ## Check and Build
 
