@@ -10,10 +10,10 @@ fitting, or significance testing is performed by these builders.
 
 | Output | Content | Builder |
 |---|---|---|
-| `paper/figures/descriptive_main.pdf` | Final-layer readout means and seed SDs, with separate zero-shot and requested-eight-shot scorer arms | `scripts/build_descriptive_figures.py` |
+| `paper/figures/descriptive_main.pdf` | Final-layer readout means, with separate zero-shot and requested-eight-shot scorer arms (seed SD stated in the caption, not drawn) | `scripts/build_descriptive_figures.py` |
 | `paper/figures/descriptive_budget.pdf` | BoolQ first-n and balanced refits, requested-shot scores, and full-training reference | `scripts/build_descriptive_figures.py` |
 | `paper/figures/descriptive_layers.pdf` | Recorded MLP layer sweeps and final-layer readouts from the same sweep sources | `scripts/build_descriptive_figures.py` |
-| `paper/tables.tex` | All four tables in one file, for the standalone wrapper | `scripts/build_descriptive_tables.py` |
+| `paper/tables.tex` | All four tables in one file, in the manuscript's float order, for the standalone wrapper | `scripts/build_descriptive_tables.py` |
 | `paper/table_{main,budget,placement,controls}.tex` | One table each; the manuscript inputs these so every wide float is declared beside the text that discusses it | `scripts/build_descriptive_tables.py` |
 | `paper/tables_macros.tex` | `\fittable` definition, input once before any table file | `scripts/build_descriptive_tables.py` |
 | `paper/main_tables.tex` | Standalone wrapper for `tables.tex` | LuaLaTeX, run from `paper/` |

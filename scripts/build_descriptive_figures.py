@@ -102,9 +102,11 @@ def main():
     print(f"SEED-SD budget: refit seed SD {100 * min(refit_sds):.2f}-"
           f"{100 * max(refit_sds):.2f}pp (not plotted; smaller than the markers)")
 
-    # The swept-curve bands DO render here (7-10 points wide, alpha 0.18), so
-    # unlike Figures 1-2 this figure keeps its SD encoding. The final-layer
-    # diamond gets no error bar: a single point's SD would be occluded again.
+    # The swept-curve bands DO render here, so unlike Figures 1-2 this figure
+    # keeps its SD encoding: a band traced along a curve stays legible at
+    # 0.15-2.33 accuracy points full width (SD 0.07-1.17pp, printed below)
+    # because no marker is drawn on top of it. The final-layer diamond gets no
+    # error bar: a single point's SD would be occluded again.
     fig, axes = plt.subplots(6, 3, figsize=(8.4, 9.4), sharey=True)
     sweep_sds = []
     for task, model, _, _, sweep in CELLS:

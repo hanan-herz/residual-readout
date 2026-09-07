@@ -1,6 +1,8 @@
 % Descriptive tables for supervised residual readouts and answer-token scoring.
 % Regenerate with scripts/build_descriptive_tables.py.
-% Tables live in tables.tex (shared with paper.tex). Build from paper/: lualatex main_tables.tex
+% Tables come from tables.tex, which carries all four in the manuscript's float
+% order for this wrapper alone; paper.tex inputs the per-table files instead.
+% Build from paper/: lualatex main_tables.tex
 \documentclass[10pt]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage{booktabs}
@@ -11,10 +13,10 @@
 \captionsetup{font=small,labelfont=bf}
 \pagestyle{empty}
 
-\newcommand{\sd}[1]{\textbf{#1}} % significant delta
-\newcommand{\pstar}{$^{*}$}
-\newcommand{\pstarstar}{$^{**}$}
-\newcommand{\pstarstarstar}{$^{***}$}
+% The captions cross-reference manuscript sections that do not exist here.
+% Defining \secref first makes tables_macros.tex's \providecommand a no-op, so
+% those references typeset as text instead of "\S??".
+\newcommand{\secref}[2]{#2}
 
 \begin{document}
 

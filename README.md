@@ -15,8 +15,8 @@ marginalizing their probability mass; corrected-baseline performance is
 unmeasured.
 
 The main result is a regime map, not a universal winner: readouts are often
-strong on rule- and passage-grounded tasks, while scoring is most useful when
-the residual readout is still weak. Existing BoolQ 8/16/32/64-label refits
+strong on rule- and passage-grounded tasks, while on ARC scoring is most
+useful where the residual readout is still weak. Existing BoolQ 8/16/32/64-label refits
 show that the full-training readout advantage is not established as
 supervision-independent. These are protocol-specific comparisons, not
 claims about free-form generation, reasoning mechanisms, or early exit.

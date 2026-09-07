@@ -38,8 +38,8 @@ by more than a crude selection-noise scale, although evaluation-selected
 maxima still do not establish held-out gains or early exit. The scorer is the stored product-of-token-probabilities
 heuristic, not marginalized answer likelihood or free-form generation. The
 contribution is therefore a protocol-specific regime map: readouts are often
-competitive on rule- and passage-grounded tasks, while scoring is most useful
-when the residual readout is still weak.
+competitive on rule- and passage-grounded tasks, while on ARC scoring is most
+useful where the residual readout is still weak.
 \end{abstract}
 
 \section{Introduction}
@@ -171,11 +171,13 @@ aggregate accuracies and, on fresh runs, class predictions rather than the
 token probabilities needed to rescore offline. These results should not be
 read as comparisons against standard answer-likelihood scoring generally.
 None of the standard corrections to closed-set answer scoring are applied
-here; \S\ref{sec:related} collects them. Token-level decision rules of this
-kind are known to be suboptimal relative to hidden-state criteria on the same
-frozen model \citep{cho2025hidden}, so our scorer is a weak rather than a
-strong output baseline, and the readout-favorable cells below are the ones to
-treat with most caution.
+here; \S\ref{sec:related} collects them. Our scorer is therefore a weak
+rather than a strong output baseline, and the readout-favorable cells below
+are the ones to treat with most caution. That caution is not a prediction
+that the gaps would vanish: \citet{cho2025hidden} report a hidden-state
+criterion beating calibrated token-based rules on the same frozen model, so a
+readout advantage can survive correction of the output side. Whether it
+survives here is unmeasured.
 
 \subsection{Supervision, context, and reporting}
 
@@ -261,11 +263,13 @@ differ (Table~\ref{tab:main}). No significance tests are shown.}
 Table~\ref{tab:main} shows that BoolQ is a mixed but informative regime.
 Qwen3-0.6B has a classifier mean of 0.746 versus 0.645 for eight-shot
 scoring, while Qwen3-8B is nearly even at 0.878 versus 0.876. The other
-models favor scoring numerically, so the result is not a universal readout
-win. It is nevertheless consistent with the broader map: once both channels
-are strong, their difference is small; where the residual readout is weaker,
-the scorer can retain an advantage. Small differences are not interpreted as
-statistical ties.
+four models favor scoring numerically, but only by 0.9 to 2.2 percentage
+points, so the result is neither a universal readout win nor a large scorer
+advantage anywhere. The ARC ordering of \S\ref{sec:tasks}, in which the
+scorer's advantage falls as the readout improves, does not extend here: the
+four scorer-favorable readouts all lie between 0.841 and 0.896, while the one
+large BoolQ gap runs the other way, at the weakest readout in the block.
+Small differences are not interpreted as statistical ties.
 
 The existing requested-shot sweep qualifies the Qwen3-8B comparison: its
 full-training readout (0.878) is below the recorded 16-, 32-, and 64-shot
@@ -508,7 +512,7 @@ are different objects and should not be substituted for one another.
 
 \textbf{Frozen representations for prediction.} Prior work studies
 differences between hidden-state classifiers and prompted or token-level
-decisions \citep{cho2025hidden,buckmann2024logistic,abbas2024linc,cho2023palp}.
+decisions \citep{cho2025hidden,buckmann2024logistic,cho2023palp}.
 \citet{hazenoot2026esg} compare frozen-activation probes with prompted
 yes/no predictions for ESG concept measurement. Our study adds a
 cross-model, three-dataset comparison under the particular protocols
@@ -520,13 +524,14 @@ distribution is turned into a closed-set decision is itself a literature.
 Raw answer-token probability is confounded by surface form, motivating
 probability-ratio scoring \citep{holtzman2021surface}; few-shot prompted
 predictions are sensitive to exemplar choice and order and improve under
-contextual calibration \citep{zhao2021calibrate}; multiple-choice evaluation
-conventionally normalizes by length or unconditional probability
-\citep{brown2020gpt3}; and calibration itself varies with depth
-\citep{joshi2025calibration}. The scorer implemented here applies none of
-these corrections (\S\ref{sec:scorer}), which places our baseline below the
-standard of that work and is the main reason our comparative claims are
-conditional rather than general.
+contextual calibration \citep{zhao2021calibrate} or a learned affine
+recalibration of the label-token probabilities \citep{abbas2024linc};
+multiple-choice evaluation conventionally normalizes by length or
+unconditional probability \citep{brown2020gpt3}; and calibration itself
+varies with depth \citep{joshi2025calibration}. The scorer implemented here
+applies none of these corrections (\S\ref{sec:scorer}), which places our
+baseline below the standard of that work and is the main reason our
+comparative claims are conditional rather than general.
 
 \textbf{Beliefs and correctness.} CCS \citep{burns2022ccs} studies
 unsupervised recovery of truth-related directions; other work examines
@@ -576,9 +581,13 @@ The experiments use public releases of BoolQ \citep{clark2019boolq},
 RuleTaker \citep{clark2020ruletaker}, and ARC-Challenge
 \citep{clark2018arc}, with splits, subsampling, and filtering described
 in \S\ref{sec:setup}. Stored result JSONs and the descriptive table
-generator accompany the manuscript in the repository at
-\url{https://github.com/hanan-herz/residual-readout-bench}. No new model
-inference or classifier fitting was performed for this revision.
+generator accompany the manuscript in a public repository
+\ifdefined\AnonymousVersion
+whose URL is withheld here because it identifies the author.
+\else
+at \url{https://github.com/hanan-herz/residual-readout-bench}.
+\fi
+No new model inference or classifier fitting was performed for this revision.
 
 \ifdefined\AnonymousVersion
 \else
