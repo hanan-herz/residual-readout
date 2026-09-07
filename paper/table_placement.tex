@@ -10,9 +10,11 @@ sweep file's \texttt{last.mlp}, not a value imported from Table~\ref{tab:main}.
 ARC Qwen3-0.6B has no L27 sweep entry; its final mean is stored separately
 in the same file.
 \emph{Cand.}\ is the number of recorded sweep entries the maximum was taken
-over. It varies from 4 to 10 across cells, and the optimism of a maximum
-grows with it, so the column is needed to read the selected means; see
-\S\ref{sec:placement} for the resulting noise scale.
+over, from 4 to 10 across cells. The optimism of a maximum grows with it, so
+the column is needed to read the selected means. The noise scale quoted in
+\S\ref{sec:placement} is the binomial standard error at the selected accuracy
+on that cell's evaluation set, times the expected maximum of \emph{Cand.}\
+independent standard normals.
 These evaluation-selected maxima are optimistic, not held-out gains;
 no significance tests are reported. Sweep train/evaluation counts are
 9427/3270 (BoolQ), 10000/4000 (RuleTaker), and 1000/1165 (ARC-Challenge).

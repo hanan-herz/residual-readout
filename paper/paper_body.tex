@@ -170,17 +170,12 @@ difference from a corrected scorer is unmeasured. The pipeline saves
 aggregate accuracies and, on fresh runs, class predictions rather than the
 token probabilities needed to rescore offline. These results should not be
 read as comparisons against standard answer-likelihood scoring generally.
-The corrections we do not apply are well studied: raw answer-token
-probability is confounded by surface form and benefits from
-probability-ratio scoring \citep{holtzman2021surface}, closed-set prompted
-predictions benefit from contextual calibration \citep{zhao2021calibrate},
-and multiple-choice evaluation is conventionally length- or
-unconditional-probability-normalized \citep{brown2020gpt3}. Token-level
-decision rules of the kind implemented here are also known to be suboptimal
-relative to hidden-state criteria on the same frozen model
-\citep{cho2025hidden}, which is independent evidence that our scorer is a
-weak rather than a strong output baseline, and hence that the readout-favorable
-cells below are the ones to treat with most caution.
+None of the standard corrections to closed-set answer scoring are applied
+here; \S\ref{sec:related} collects them. Token-level decision rules of this
+kind are known to be suboptimal relative to hidden-state criteria on the same
+frozen model \citep{cho2025hidden}, so our scorer is a weak rather than a
+strong output baseline, and the readout-favorable cells below are the ones to
+treat with most caution.
 
 \subsection{Supervision, context, and reporting}
 
@@ -374,32 +369,26 @@ across models and tasks; several ARC maxima occur at the final layer.
 
 Selection uses the same evaluation labels on which accuracy is reported, so
 the selected maxima are optimistic estimates of a layer-selection procedure's
-generalization. The optimism has a magnitude a reader can check. Taking the
-binomial standard error at the observed accuracy on each evaluation set and
-multiplying by the expected maximum of as many independent standard normals
-as there are swept candidates gives a scale of 0.7 to 2.1 accuracy points,
+generalization. That optimism has a magnitude: 0.7 to 2.1 accuracy points,
 varying with evaluation size and with the 4 to 10 candidates per cell
-(Table~\ref{tab:placement}). Twelve of the 18 selected-minus-final gaps
+(Table~\ref{tab:placement} gives the derivation and
+\texttt{--report} reproduces it). Twelve of the 18 selected-minus-final gaps
 exceed that scale, including all six RuleTaker cells and five of six BoolQ
-cells but only one of six on ARC, where the evaluation set is smallest. This
+cells but only one of six on ARC, where the evaluation set is smallest. The
+six that do not are BoolQ DeepSeek and every ARC cell except Qwen3-4B, three
+of them exactly zero because the maximum falls at the final layer. The
 yardstick is deliberately crude and, if anything, too strict: layer readouts
 are positively correlated across depth, which shrinks the real inflation
-below the independent-candidate figure. It is arithmetic on the stored
-accuracies, not a hypothesis test, and it is reproduced by
-\texttt{--report} in the table generator.
+below the independent-candidate figure.
 
-The gaps that clear the scale are therefore harder to explain as selection
-artifacts alone; the six that do not are BoolQ DeepSeek and every ARC cell
-except Qwen3-4B, three of which are exactly zero because the maximum falls at
-the final layer. Clearing the scale is not a significance claim: it bounds
-the optimism from picking a maximum, not the evaluation-sampling uncertainty
-of the underlying difference, and the reported means average four training
-seeds rather than one draw. A paired test
-at the selected layer, followed only by correction across the 18 cells, would
-still not account for the within-cell layer search, so we report no
-selection-unadjusted significance and make no claim that intermediate layers
-never lose. These sweeps describe predictive readouts, not the behavior of a
-backbone stopped early.
+Clearing the scale is not a significance claim. It bounds the optimism from
+picking a maximum, not the evaluation-sampling uncertainty of the underlying
+difference, and the reported means average four training seeds rather than
+one draw. A paired test at the selected layer, followed only by correction
+across the 18 cells, would still not account for the within-cell layer
+search, so we report no selection-unadjusted significance and make no claim
+that intermediate layers never lose. These sweeps describe predictive
+readouts, not the behavior of a backbone stopped early.
 
 Figure~\ref{fig:descriptive-layers} displays all recorded MLP sweep points
 rather than highlighting evaluation-selected maxima.
@@ -427,17 +416,15 @@ Table~\ref{tab:controls} gives label-shuffle, random-projection, noise,
 and mean-pooled-context results. Context pooling averages all retained
 nonpadding prompt tokens, not just passage tokens. Shuffling training labels generally
 reduces predictive accuracy, but this is not a dataset-overlap audit and
-does not rule out leakage. On imbalanced datasets, uniform guessing and
-majority-class prediction have different expected accuracies, so the
-constant-predictor rate is the reference these controls should be read
-against: it is 0.6217 on the BoolQ validation split, 0.5035 on the RuleTaker
-evaluation subset, and 0.2652 on the ARC evaluation split, the last against a
-0.25 uniform rate. Against those references the BoolQ shuffle controls
-(0.522--0.542) fall well below a constant predictor, whereas five of the six
-ARC shuffle controls sit slightly above 0.2652. Table~\ref{tab:budget}
-should be read the same way: the Qwen3-0.6B refits span 0.594 to 0.660,
-straddling the BoolQ constant-predictor rate, so the smallest-budget readouts
-there are near or below trivial rather than merely weak.
+does not rule out leakage. On imbalanced datasets uniform guessing and
+majority-class prediction differ, so the reference for these controls is the
+constant-predictor rate: 0.6217 on BoolQ, 0.5035 on the RuleTaker evaluation
+subset, and 0.2652 on ARC, the last against a 0.25 uniform rate. The BoolQ
+shuffle controls (0.522--0.542) fall well below it; five of the six ARC
+shuffle controls sit slightly above it. Read the same way, the Qwen3-0.6B
+refits of Table~\ref{tab:budget} span 0.594 to 0.660 and straddle the BoolQ
+rate, so the smallest-budget readouts there are near or below trivial rather
+than merely weak.
 
 Gaussian projections retain substantial predictive accuracy at the tested
 dimensions (64 or 256, reported per row in Table~\ref{tab:controls}). The
@@ -507,11 +494,10 @@ comparison to fine-tuned specialists under matched resources.
 descriptive tables from stored JSONs. Sweep and headline entries are
 distinct in the source mapping only where separate files are used; some
 entries share a file or cached computation, so the tables do not provide a
-run-to-run variability estimate. Where the same quantity was stored twice by
-different runs it does not always agree: the BoolQ Qwen3-0.6B first-$n$
-readout at $n=64$ is 0.657 in the headline file and 0.660 in the label-budget
-file. Both readings support the statements that use them, and the difference
-indicates the scale of run-to-run drift rather than an error in either. Local
+run-to-run variability estimate; where a quantity was stored twice it can
+differ slightly, as with the BoolQ Qwen3-0.6B 64-label readout (0.657 in the
+headline file, 0.660 in the label-budget file, both supporting the statements
+that use them). Local
 full-size paired scorer/readout predictions are incomplete for BoolQ
 Qwen3-0.6B, Qwen3-8B, and DeepSeek; scalar results exist for all 18 cells.
 Persisted best-seed heads, seed means, and separately fitted vote ensembles
@@ -603,7 +589,8 @@ assisted with the methodological audit and manuscript revision. The author
 designed the study and is responsible for reviewing the results and claims.
 \fi
 
-\clearpage
+% No \clearpage: it forced the bibliography onto a fresh page and wasted most
+% of the Acknowledgments page. Nothing floats past the references without it.
 \begingroup
 \raggedright
 \bibliographystyle{plainnat}
