@@ -72,4 +72,4 @@ Their generators write only the retained outputs under `paper/figures/`.
 The old results narrative is preserved in root
 [`RESULTS_HISTORICAL.md`](RESULTS_HISTORICAL.md), with a current summary in
 [`RESULTS.md`](RESULTS.md). The canonical public paper remains
-`paper/paper.pdf`; `paper/paper-revised.pdf` is an ignored local copy.
+`paper/paper.pdf`.

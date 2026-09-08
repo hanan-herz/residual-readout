@@ -54,7 +54,6 @@ fully reproduced identical-example experiment; no significance tests are used.
 
 - [Explicit source mappings](scripts/build_descriptive_tables.py): `CELLS` maps headline readouts, loop overrides, and separate placement sweeps; `BUDGET` maps the `samek` sources.
 - [Generated paper tables](paper/tables.tex): source filenames are included in comments. BoolQ Mistral/Granite loops use full-evaluation reruns, not the sweeps' 405-row loops. RuleTaker headline and sweep files both use 10k/4k but remain distinct sources.
-- [Revision notes](PAPER_REVISION.md): methodology changes and paper/figure build instructions.
 - [Historical results log](RESULTS_HISTORICAL.md): preserved incidents, provenance, and superseded conclusions, not current evidence summaries.
 - [Synthetic exploration](RESULTS_SYNTHETIC.md): separate historical work, not evidence for the revised paper.
 

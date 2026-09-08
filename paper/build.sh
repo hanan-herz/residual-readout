@@ -13,3 +13,12 @@ lualatex -interaction=nonstopmode -halt-on-error paper.tex
 bibtex paper
 lualatex -interaction=nonstopmode -halt-on-error paper.tex
 lualatex -interaction=nonstopmode -halt-on-error paper.tex
+
+# The manuscript is expected to compile clean. -halt-on-error catches errors
+# but not warnings, and a warning is how an undefined cross-reference, a
+# dropped character, or an overfull box has slipped past before.
+if grep -nE 'Warning:|warning \(|Overfull|Underfull|Missing character' paper.log; then
+  echo "build.sh: paper.log has the warnings listed above; not accepting the PDF" >&2
+  exit 1
+fi
+echo "build.sh: paper.pdf built with no warning lines"

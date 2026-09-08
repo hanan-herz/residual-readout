@@ -61,8 +61,7 @@ the `paper/` directory.
 
 The build checks the tables, regenerates the three descriptive PDF figures,
 and compiles the public `paper/paper.pdf`. It does not load models or fit
-classifiers. `paper/paper-revised.pdf` is an ignored local revision copy,
-not a second public paper.
+classifiers.
 
 ### Experiments (separate setup)
 

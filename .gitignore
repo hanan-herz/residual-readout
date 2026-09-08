@@ -45,8 +45,6 @@ paper/how-we-differ-belinkov.md
 paper/AI-IGNORE
 
 # --- LaTeX build intermediates ---
-paper/.build-revision/
-paper/paper-revised.pdf
 paper/paper-review.pdf
 paper/paper_anonymous.pdf
 paper/main_tables.pdf
